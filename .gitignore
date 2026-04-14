@@ -1,0 +1,29 @@
+# Models and engines
+*.pt
+*.onnx
+*.engine
+*.trt
+*.gguf
+*.safetensors
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Logs
+*.log
+*.nsys-rep
+
+# Test images (keep sample ones)
+test_image.jpg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

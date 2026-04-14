@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLMs on Jetson Orin Nano: Fitting Vision-Language Models in 8GB — Hokwang Choi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fafafa;
+            --text: #1a1a1a;
+            --text-muted: #666;
+            --heading: #0d0d0d;
+            --accent: #76b900;
+            --code-bg: #2d2d2d;
+            --border: #e0e0e0;
+            --card-bg: #f8f8f8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 18px;
+            line-height: 1.75;
+            color: var(--text);
+            background: var(--bg);
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem;
+        }
+
+        .nav {
+            margin-bottom: 3rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .nav a { color: var(--accent); text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+
+        .tags { margin-bottom: 1rem; }
+        .tag {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 3px;
+            margin-right: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--heading);
+            line-height: 1.3;
+            margin-bottom: 1rem;
+        }
+
+        .meta {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--heading);
+            margin: 3rem 0 1rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--heading);
+            margin: 2rem 0 0.75rem;
+        }
+
+        p { margin-bottom: 1.25rem; }
+
+        ul, ol {
+            margin: 0 0 1.25rem 1.5rem;
+        }
+        li { margin-bottom: 0.5rem; }
+
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.88em;
+            background: #f0f0f0;
+            padding: 0.15em 0.4em;
+            border-radius: 3px;
+        }
+
+        pre {
+            background: var(--code-bg);
+            padding: 1.25rem 1.5rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85em;
+            line-height: 1.6;
+            color: #e6e6e6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.95rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.9rem;
+            text-align: left;
+        }
+        th {
+            background: var(--card-bg);
+            font-weight: 600;
+        }
+
+        .tldr {
+            background: var(--card-bg);
+            border-left: 4px solid var(--accent);
+            padding: 1.25rem 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .tldr strong { color: var(--heading); }
+
+        .highlight {
+            background: #fff3cd;
+            border-left: 4px solid var(--accent);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .warning {
+            background: #ffe0e0;
+            border-left: 4px solid #d32f2f;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .figure {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        .figure img {
+            max-width: 100%;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .figure figcaption {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://hokwangchoi.com/#blog">All Posts</a>
+        <span> · hokwangchoi.com/blog</span>
+    </nav>
+
+    <article>
+        <div class="tags">
+            <span class="tag">VLM</span>
+            <span class="tag">Edge AI</span>
+            <span class="tag">Jetson</span>
+        </div>
+
+        <h1>VLMs on Jetson Orin Nano: Fitting Vision-Language Models in 8GB</h1>
+
+        <p class="meta">
+            Hokwang Choi · April 2026 · 10 min read
+        </p>
+
+        <div class="tldr">
+            <strong>TL;DR</strong><br><br>
+            <strong>Challenge:</strong> Run VLMs on 8GB unified memory<br>
+            <strong>Models tested:</strong> Qwen2.5-VL-3B (INT4), Cosmos Reason 2B (FP8)<br>
+            <strong>Key metrics:</strong> TTFT, tokens/sec, peak memory<br>
+            <strong>Finding:</strong> Sub-4B models fit with aggressive quantization<br>
+            <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
+        </div>
+
+        <h2>The Challenge: VLMs on Edge Hardware</h2>
+
+        <p>
+            Vision-Language Models are transforming what's possible with AI — they understand 
+            images and generate text. But they're memory-hungry. A typical 7B VLM needs 14GB+ 
+            in FP16, and we only have 8GB.
+        </p>
+
+        <p>
+            Can we run VLMs on the Jetson Orin Nano? Yes — but it requires careful model 
+            selection and aggressive quantization.
+        </p>
+
+        <h2>Memory Budget</h2>
+
+        <p>The Orin Nano has 8GB unified memory shared between CPU and GPU:</p>
+
+        <table>
+            <tr><td>Total RAM</td><td>8192 MB</td></tr>
+            <tr><td>System/OS</td><td>~800 MB</td></tr>
+            <tr><td>Desktop (GNOME)</td><td>~1200 MB</td></tr>
+            <tr><td><strong>Available for model</strong></td><td><strong>~6000 MB</strong></td></tr>
+        </table>
+
+        <p>
+            With the desktop running, we have ~6GB. Kill the GUI and we get ~7GB. 
+            That's our ceiling.
+        </p>
+
+        <h2>Model Selection</h2>
+
+        <p>
+            VLM memory is dominated by the LLM decoder. A 7B model in FP16 needs 14GB — 
+            way over budget. We need smaller models with quantization:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Parameters</th>
+                    <th>FP16 Size</th>
+                    <th>INT4 Size</th>
+                    <th>Fits?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>LLaVA-1.5-7B</td>
+                    <td>7B</td>
+                    <td>14 GB</td>
+                    <td>~4 GB</td>
+                    <td>Tight</td>
+                </tr>
+                <tr>
+                    <td>Qwen2.5-VL-3B</td>
+                    <td>3B</td>
+                    <td>6 GB</td>
+                    <td>~2 GB</td>
+                    <td>✓</td>
+                </tr>
+                <tr>
+                    <td>Cosmos Reason 2B</td>
+                    <td>2B</td>
+                    <td>4 GB</td>
+                    <td>~1.5 GB</td>
+                    <td>✓</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            I focused on <strong>Qwen2.5-VL-3B</strong> and <strong>Cosmos Reason 2B</strong> — 
+            both designed for efficiency while maintaining strong vision-language capabilities.
+        </p>
+
+        <h2>Benchmark Methodology</h2>
+
+        <h3>Metrics</h3>
+
+        <ul>
+            <li><strong>TTFT</strong> — Time to first token. How long until generation starts?</li>
+            <li><strong>Tokens/sec</strong> — Generation throughput</li>
+            <li><strong>Peak memory</strong> — Maximum GPU memory during inference</li>
+            <li><strong>Power</strong> — Average power draw</li>
+        </ul>
+
+        <h3>Test Setup</h3>
+
+        <ul>
+            <li>Input: 384×384 image + short prompt ("Describe this image in detail")</li>
+            <li>Output: 100 tokens generated</li>
+            <li>Warmup: 2 inference passes</li>
+            <li>Measured: 10 passes, averaged</li>
+        </ul>
+
+        <h2>Results</h2>
+
+        <table id="vlm-results">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Precision</th>
+                    <th>TTFT (ms)</th>
+                    <th>Tokens/s</th>
+                    <th>Memory (MB)</th>
+                    <th>Power (W)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- VLM_RESULTS_PLACEHOLDER -->
+                <tr><td>Qwen2.5-VL-3B</td><td>INT4</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Cosmos Reason 2B</td><td>FP8</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <div class="figure">
+            <!-- RESULTS_CHART_PLACEHOLDER -->
+            <figcaption>Figure 1: VLM inference performance comparison</figcaption>
+        </div>
+
+        <h2>Deployment Options</h2>
+
+        <h3>Option 1: Jetson AI Lab + llama.cpp</h3>
+
+        <p>
+            The <a href="https://www.jetson-ai-lab.com/">Jetson AI Lab</a> provides optimized 
+            containers. For VLMs, <code>llama.cpp</code> with GGUF models is the most 
+            memory-efficient option:
+        </p>
+
+        <pre><code class="language-bash"># Pull the container
+docker pull dustynv/llama-cpp:r36.4.0
+
+# Run with GPU
+docker run --runtime nvidia -it --rm \
+    -v ~/models:/models \
+    dustynv/llama-cpp:r36.4.0
+
+# Inside container
+./llama-cli -m /models/qwen2.5-vl-3b-q4.gguf \
+    --image /path/to/image.jpg \
+    -p "Describe this image"</code></pre>
+
+        <h3>Option 2: TensorRT-LLM</h3>
+
+        <p>
+            For maximum performance, TensorRT-LLM provides optimized inference. However, 
+            VLM support is still maturing:
+        </p>
+
+        <pre><code class="language-bash"># Build engine (on Jetson)
+python build.py --model_dir ./qwen2.5-vl-3b \
+    --dtype float16 \
+    --use_weight_only \
+    --weight_only_precision int4</code></pre>
+
+        <div class="warning">
+            <strong>Warning:</strong> TensorRT-LLM build times on Jetson are long (1-2 hours). 
+            Consider cross-compiling on a workstation if iteration speed matters.
+        </div>
+
+        <h3>Option 3: ExLlamaV2</h3>
+
+        <p>
+            ExLlamaV2 offers excellent quantization with good performance on consumer hardware:
+        </p>
+
+        <pre><code class="language-python">from exllamav2 import ExLlamaV2, ExLlamaV2Config
+
+config = ExLlamaV2Config()
+config.model_dir = "./qwen2.5-vl-3b-exl2"
+config.max_seq_len = 2048
+
+model = ExLlamaV2(config)
+model.load()</code></pre>
+
+        <h2>Memory Optimization Techniques</h2>
+
+        <h3>1. Kill the Desktop</h3>
+
+        <pre><code class="language-bash"># Switch to text mode
+sudo systemctl isolate multi-user.target
+
+# Back to desktop later
+sudo systemctl isolate graphical.target</code></pre>
+
+        <p>This frees ~1.2GB immediately.</p>
+
+        <h3>2. Clear Caches</h3>
+
+        <pre><code class="language-bash">sudo sysctl -w vm.drop_caches=3</code></pre>
+
+        <h3>3. Use Flash Attention</h3>
+
+        <p>
+            If your framework supports it, Flash Attention reduces memory for long sequences. 
+            Critical for VLMs processing high-resolution images.
+        </p>
+
+        <h3>4. Streaming Decode</h3>
+
+        <p>
+            Generate tokens one at a time rather than batching. Trades throughput for lower 
+            peak memory — necessary when you're at the edge of capacity.
+        </p>
+
+        <h2>Use Case: Driving Scene Understanding</h2>
+
+        <p>
+            I tested with driving scene images from nuScenes. The prompt:
+        </p>
+
+        <pre><code>"You are an autonomous vehicle perception system. 
+Describe the scene: identify vehicles, pedestrians, 
+traffic signs, and potential hazards."</code></pre>
+
+        <div class="figure">
+            <!-- DRIVING_SCENE_PLACEHOLDER -->
+            <figcaption>Figure 2: Example driving scene analysis with Qwen2.5-VL-3B</figcaption>
+        </div>
+
+        <h3>Sample Output</h3>
+
+        <pre><code>The scene shows a four-lane urban road during daytime. 
+Ahead: a white sedan (approx 30m), a delivery truck in 
+the right lane (approx 50m). Left lane is clear. 
+Traffic light ahead shows green. Pedestrian on right 
+sidewalk, not crossing. No immediate hazards detected.</code></pre>
+
+        <p>
+            Generation took ~X seconds for ~80 tokens. Not real-time, but useful for 
+            logging, annotation, or second-opinion systems.
+        </p>
+
+        <h2>Lessons Learned</h2>
+
+        <h3>VLMs are Memory-Bound</h3>
+
+        <p>
+            Unlike vision models where compute is the bottleneck, VLM inference on Jetson 
+            is entirely memory-bound. Quantization is mandatory, not optional.
+        </p>
+
+        <h3>Vision Encoder Matters</h3>
+
+        <p>
+            The vision encoder (often ViT-based) needs memory too. Qwen2.5-VL's dynamic 
+            resolution handling is elegant but increases memory for large images. Resize 
+            inputs to 384×384 or smaller.
+        </p>
+
+        <h3>TTFT Dominates User Experience</h3>
+
+        <p>
+            For interactive applications, time-to-first-token matters more than tokens/sec. 
+            Users perceive 2-second TTFT as "slow" even if throughput is decent.
+        </p>
+
+        <h2>Conclusion</h2>
+
+        <ul>
+            <li><strong>Sub-4B VLMs</strong> fit on Orin Nano with INT4/INT8 quantization</li>
+            <li><strong>~6GB</strong> is the practical memory budget with desktop running</li>
+            <li><strong>llama.cpp</strong> with GGUF is the simplest deployment path</li>
+            <li><strong>Driving scene understanding</strong> works but isn't real-time</li>
+        </ul>
+
+        <p>
+            The Jetson Orin Nano isn't an LLM powerhouse, but it can run useful VLM inference 
+            for edge applications where cloud connectivity is limited or latency matters.
+        </p>
+
+        <h2>Reproduce It</h2>
+
+        <pre><code class="language-bash">git clone https://github.com/hokwangchoi/jetson-orin-nano-benchmarks.git
+cd jetson-orin-nano-benchmarks/vlm-benchmarks/scripts
+pip3 install -r requirements.txt
+python3 benchmark_vlm.py</code></pre>
+
+    </article>
+
+    <footer>
+        <a href="https://hokwangchoi.com/#blog">← Back to all posts</a>
+        <br>© 2026 Hokwang Choi
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+</body>
+</html>

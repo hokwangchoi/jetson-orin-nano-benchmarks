@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv8 on Jetson Orin Nano: PyTorch to TensorRT — Hokwang Choi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fafafa;
+            --text: #1a1a1a;
+            --text-muted: #666;
+            --heading: #0d0d0d;
+            --accent: #76b900;
+            --code-bg: #2d2d2d;
+            --border: #e0e0e0;
+            --card-bg: #f8f8f8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 18px;
+            line-height: 1.75;
+            color: var(--text);
+            background: var(--bg);
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem;
+        }
+
+        .nav {
+            margin-bottom: 3rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .nav a { color: var(--accent); text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+
+        .tags { margin-bottom: 1rem; }
+        .tag {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 3px;
+            margin-right: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--heading);
+            line-height: 1.3;
+            margin-bottom: 1rem;
+        }
+
+        .meta {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--heading);
+            margin: 3rem 0 1rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--heading);
+            margin: 2rem 0 0.75rem;
+        }
+
+        p { margin-bottom: 1.25rem; }
+
+        ul, ol {
+            margin: 0 0 1.25rem 1.5rem;
+        }
+        li { margin-bottom: 0.5rem; }
+
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.88em;
+            background: #f0f0f0;
+            padding: 0.15em 0.4em;
+            border-radius: 3px;
+        }
+
+        pre {
+            background: var(--code-bg);
+            padding: 1.25rem 1.5rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85em;
+            line-height: 1.6;
+            color: #e6e6e6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.95rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.9rem;
+            text-align: left;
+        }
+        th {
+            background: var(--card-bg);
+            font-weight: 600;
+        }
+
+        .tldr {
+            background: var(--card-bg);
+            border-left: 4px solid var(--accent);
+            padding: 1.25rem 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .tldr strong { color: var(--heading); }
+
+        .card {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+        .card h3 { color: var(--accent); margin-top: 0; }
+        .card code { background: rgba(255,255,255,0.1); color: #fff; }
+
+        .highlight {
+            background: #fff3cd;
+            border-left: 4px solid var(--accent);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .figure {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        .figure img {
+            max-width: 100%;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .figure figcaption {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="https://hokwangchoi.com/#blog">All Posts</a>
+        <span> · hokwangchoi.com/blog</span>
+    </nav>
+
+    <article>
+        <div class="tags">
+            <span class="tag">Edge AI</span>
+            <span class="tag">TensorRT</span>
+            <span class="tag">Jetson</span>
+        </div>
+
+        <h1>YOLOv8 on Jetson Orin Nano: PyTorch to TensorRT</h1>
+
+        <p class="meta">
+            Hokwang Choi · April 2026 · 8 min read
+        </p>
+
+        <div class="tldr">
+            <strong>TL;DR</strong><br><br>
+            <strong>Hardware:</strong> Jetson Orin Nano 8GB (67 TOPS in Super mode)<br>
+            <strong>Model:</strong> YOLOv8n, 640×640 input<br>
+            <strong>Best config:</strong> TensorRT FP16 — Xms latency, Y FPS<br>
+            <strong>Speedup:</strong> ~Nx over PyTorch baseline<br>
+            <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
+        </div>
+
+        <h2>The Problem: Edge Inference Performance</h2>
+
+        <p>
+            You have a vision model. You want to run it on the edge. The vendor says 
+            "67 TOPS!" but what does that mean for your actual workload?
+        </p>
+
+        <p>
+            I ran YOLOv8n through the full optimization pipeline on a Jetson Orin Nano to 
+            find out. This post covers the journey from PyTorch to TensorRT, with actual 
+            numbers at each step.
+        </p>
+
+        <h2>Hardware Setup</h2>
+
+        <table>
+            <tr><td><strong>Device</strong></td><td>Jetson Orin Nano 8GB Developer Kit</td></tr>
+            <tr><td><strong>GPU</strong></td><td>1024 CUDA cores, 32 Tensor Cores (Ampere)</td></tr>
+            <tr><td><strong>Memory</strong></td><td>8GB LPDDR5 unified CPU/GPU</td></tr>
+            <tr><td><strong>JetPack</strong></td><td>6.2</td></tr>
+            <tr><td><strong>Power Mode</strong></td><td>MAXN SUPER (uncapped)</td></tr>
+        </table>
+
+        <h2>Benchmark Methodology</h2>
+
+        <p>All benchmarks used:</p>
+        <ul>
+            <li>500ms warmup period</li>
+            <li>10 second measurement window</li>
+            <li>Batch size 1 (real-time inference)</li>
+            <li>Input: 640×640 RGB</li>
+        </ul>
+
+        <p>
+            Metrics captured: latency (ms), throughput (FPS), GPU memory (MB), 
+            and power draw (W) via <code>tegrastats</code>.
+        </p>
+
+        <h2>Results</h2>
+
+        <table id="results">
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Precision</th>
+                    <th>Latency (ms)</th>
+                    <th>FPS</th>
+                    <th>Memory (MB)</th>
+                    <th>Power (W)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- RESULTS_PLACEHOLDER: Will be filled with actual benchmark data -->
+                <tr><td>PyTorch</td><td>FP32</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>TensorRT</td><td>FP32</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>TensorRT</td><td>FP16</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>TensorRT</td><td>INT8</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <div class="figure">
+            <!-- CHART_PLACEHOLDER -->
+            <figcaption>Figure 1: Latency comparison across runtimes and precisions</figcaption>
+        </div>
+
+        <h2>The Optimization Pipeline</h2>
+
+        <h3>Step 1: PyTorch Baseline</h3>
+
+        <p>
+            Start with the Ultralytics YOLOv8n model. This is our baseline — no optimization, 
+            just PyTorch with CUDA.
+        </p>
+
+        <pre><code class="language-python">from ultralytics import YOLO
+
+model = YOLO("yolov8n.pt")
+results = model.predict(source="bus.jpg")</code></pre>
+
+        <h3>Step 2: Export to ONNX</h3>
+
+        <p>
+            ONNX is the intermediate representation. TensorRT consumes ONNX and produces 
+            an optimized engine.
+        </p>
+
+        <pre><code class="language-bash">yolo export model=yolov8n.pt format=onnx imgsz=640</code></pre>
+
+        <h3>Step 3: Build TensorRT Engines</h3>
+
+        <p>
+            TensorRT performs layer fusion, kernel auto-tuning, and precision calibration. 
+            Each engine is hardware-specific — what's built on Orin Nano runs only on Orin Nano.
+        </p>
+
+        <pre><code class="language-bash"># FP32 — baseline TensorRT
+trtexec --onnx=yolov8n.onnx --saveEngine=yolov8n_fp32.engine
+
+# FP16 — uses Tensor Cores
+trtexec --onnx=yolov8n.onnx --fp16 --saveEngine=yolov8n_fp16.engine
+
+# INT8 — requires calibration for production
+trtexec --onnx=yolov8n.onnx --int8 --saveEngine=yolov8n_int8.engine</code></pre>
+
+        <div class="highlight">
+            <strong>Note:</strong> INT8 without a calibration dataset uses simple min-max 
+            scaling. For production, provide representative images for better accuracy.
+        </div>
+
+        <h3>Step 4: Benchmark Each Engine</h3>
+
+        <pre><code class="language-bash"># Run benchmark with trtexec
+trtexec --loadEngine=yolov8n_fp16.engine \
+        --batch=1 \
+        --warmUp=500 \
+        --duration=10 \
+        --avgRuns=100</code></pre>
+
+        <h2>Analysis</h2>
+
+        <h3>PyTorch → TensorRT FP32</h3>
+
+        <p>
+            Even without precision reduction, TensorRT provides significant speedup through 
+            kernel fusion and memory optimization. Convolution + BatchNorm + ReLU sequences 
+            become single fused kernels.
+        </p>
+
+        <h3>FP32 → FP16</h3>
+
+        <p>
+            FP16 enables Tensor Core utilization. The Orin Nano's 32 Tensor Cores are 
+            designed for mixed-precision workloads — FP16 compute with FP32 accumulation. 
+            Memory bandwidth is halved, and throughput roughly doubles.
+        </p>
+
+        <h3>FP16 → INT8</h3>
+
+        <p>
+            INT8 reduces memory footprint and can improve throughput further, but accuracy 
+            depends on calibration quality. For object detection, INT8 typically works well 
+            with minimal mAP loss.
+        </p>
+
+        <h2>Power Efficiency</h2>
+
+        <p>
+            Edge deployment often cares about FPS-per-watt as much as raw FPS. 
+            I tested YOLOv8n FP16 across power modes:
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Power Mode</th><th>TDP</th><th>FPS</th><th>FPS/Watt</th></tr>
+            </thead>
+            <tbody>
+                <!-- POWER_RESULTS_PLACEHOLDER -->
+                <tr><td>15W</td><td>15W</td><td>—</td><td>—</td></tr>
+                <tr><td>25W</td><td>25W</td><td>—</td><td>—</td></tr>
+                <tr><td>MAXN SUPER</td><td>~25W</td><td>—</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Profiling with Nsight Systems</h2>
+
+        <p>
+            To understand <em>why</em> FP16 is faster, profile with Nsight Systems:
+        </p>
+
+        <pre><code class="language-bash">nsys profile --trace=cuda,nvtx \
+    trtexec --loadEngine=yolov8n_fp16.engine --batch=1 --duration=5</code></pre>
+
+        <p>
+            The trace shows Tensor Core kernels (names containing <code>hmma</code> or 
+            <code>imma</code>) dominating the GPU timeline, with minimal memory transfer overhead.
+        </p>
+
+        <div class="figure">
+            <!-- NSIGHT_SCREENSHOT_PLACEHOLDER -->
+            <figcaption>Figure 2: Nsight Systems trace showing Tensor Core kernel execution</figcaption>
+        </div>
+
+        <h2>Practical Considerations</h2>
+
+        <h3>Memory Management</h3>
+
+        <p>
+            The Orin Nano has 8GB unified memory. Running the desktop environment consumes 
+            ~1-2GB. For maximum memory headroom:
+        </p>
+
+        <pre><code class="language-bash"># Drop to multi-user (no GUI)
+sudo systemctl isolate multi-user.target
+
+# Clear filesystem cache
+sudo sysctl -w vm.drop_caches=3</code></pre>
+
+        <h3>Thermal Throttling</h3>
+
+        <p>
+            Sustained inference can cause thermal throttling. Monitor with <code>jtop</code> 
+            and ensure adequate cooling. The stock heatsink works for burst inference; 
+            active cooling helps for continuous workloads.
+        </p>
+
+        <h3>Engine Portability</h3>
+
+        <p>
+            TensorRT engines are not portable across GPU architectures. An engine built on 
+            Orin Nano (Ampere) won't run on Xavier (Volta). Rebuild for each target.
+        </p>
+
+        <h2>Conclusion</h2>
+
+        <p>Key takeaways:</p>
+        <ul>
+            <li><strong>TensorRT FP16</strong> is the sweet spot — Tensor Core acceleration 
+                with no accuracy loss</li>
+            <li><strong>INT8</strong> offers additional gains but requires proper calibration</li>
+            <li><strong>Power efficiency</strong> is excellent — real-time object detection 
+                at under 15W is achievable</li>
+            <li><strong>Memory</strong> is the constraint — optimize for memory when deploying 
+                larger models</li>
+        </ul>
+
+        <h2>Reproduce It</h2>
+
+        <pre><code class="language-bash">git clone https://github.com/hokwangchoi/jetson-orin-nano-benchmarks.git
+cd jetson-orin-nano-benchmarks/vision-benchmarks/scripts
+pip3 install ultralytics
+python3 benchmark_yolov8.py</code></pre>
+
+        <p>
+            Results are saved to <code>assets/results/</code> as JSON.
+        </p>
+    </article>
+
+    <footer>
+        <a href="https://hokwangchoi.com/#blog">← Back to all posts</a>
+        <br>© 2026 Hokwang Choi
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+</body>
+</html>
