@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-04-14T00:06:48.566692",
+  "system": {
+    "device": "Jetson Orin Nano 8GB",
+    "storage": "Samsung PRO Plus 256GB microSD",
+    "l4t_version": "L4T 36.4.7",
+    "power_mode": "15W"
+  },
+  "config": {
+    "model": "yolov8n",
+    "model_gflops": 8.7,
+    "model_params": 3200000.0,
+    "input_size": [
+      640,
+      640
+    ],
+    "batch_size": 1,
+    "pytorch_warmup_runs": 100,
+    "pytorch_benchmark_runs": 500,
+    "trt_iterations": 5,
+    "trt_duration_per_iteration_s": 15,
+    "hardware_peak_tops_int8": 40,
+    "hardware_peak_tflops_fp16": 20,
+    "notes": "GPU latency excludes H2D/D2H transfers. TOPS = GFLOPs / latency_s / 1000. Utilization = achieved / peak."
+  },
+  "benchmarks": [
+    {
+      "runtime": "PyTorch",
+      "precision": "FP32",
+      "gpu_latency_ms": 23.69,
+      "gpu_latency_std_ms": 0.334,
+      "fps": 42.2,
+      "fps_std": -0.6,
+      "power_w": 9.42,
+      "tops": 0.367,
+      "tops_utilization_pct": 3.7,
+      "iterations": 500,
+      "measurement": "CUDA events (GPU-only)"
+    },
+    {
+      "runtime": "TensorRT",
+      "precision": "FP32",
+      "gpu_latency_ms": 11.04,
+      "gpu_latency_std_ms": 0.014,
+      "host_latency_ms": 11.83,
+      "fps": 90.5,
+      "fps_std": 0.1,
+      "power_w": 10.88,
+      "power_std_w": 0.06,
+      "tops": 0.788,
+      "tops_utilization_pct": 7.9,
+      "iterations": 5,
+      "measurement": "trtexec GPU Compute Time (mean of means)"
+    },
+    {
+      "runtime": "TensorRT",
+      "precision": "FP16",
+      "gpu_latency_ms": 6.13,
+      "gpu_latency_std_ms": 0.012,
+      "host_latency_ms": 6.88,
+      "fps": 163.0,
+      "fps_std": 0.3,
+      "power_w": 10.21,
+      "power_std_w": 0.01,
+      "tops": 1.419,
+      "tops_utilization_pct": 7.1,
+      "iterations": 5,
+      "measurement": "trtexec GPU Compute Time (mean of means)"
+    },
+    {
+      "runtime": "TensorRT",
+      "precision": "INT8",
+      "gpu_latency_ms": 4.9,
+      "gpu_latency_std_ms": 0.013,
+      "host_latency_ms": 5.52,
+      "fps": 204.0,
+      "fps_std": 0.5,
+      "power_w": 9.08,
+      "power_std_w": 0.02,
+      "tops": 1.776,
+      "tops_utilization_pct": 4.4,
+      "iterations": 5,
+      "measurement": "trtexec GPU Compute Time (mean of means)"
+    }
+  ],
+  "nsight_profiles": [
+    "/home/hc/code/jetson-orin-nano-benchmarks/vision-benchmarks/assets/results/nsight_profiles/yolov8n_fp16.nsys-rep",
+    "/home/hc/code/jetson-orin-nano-benchmarks/vision-benchmarks/assets/results/nsight_profiles/yolov8n_int8.nsys-rep"
+  ]
+}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YOLOv8 on Jetson Orin Nano: PyTorch to TensorRT — Hokwang Choi</title>
+    <title>YOLOv8 on Jetson Orin Nano: From PyTorch to TensorRT INT8 — Hokwang Choi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -87,9 +87,7 @@
 
         p { margin-bottom: 1.25rem; }
 
-        ul, ol {
-            margin: 0 0 1.25rem 1.5rem;
-        }
+        ul, ol { margin: 0 0 1.25rem 1.5rem; }
         li { margin-bottom: 0.5rem; }
 
         a { color: var(--accent); text-decoration: none; }
@@ -143,19 +141,17 @@
         }
         .tldr strong { color: var(--heading); }
 
-        .card {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            color: #fff;
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin: 1.5rem 0;
-        }
-        .card h3 { color: var(--accent); margin-top: 0; }
-        .card code { background: rgba(255,255,255,0.1); color: #fff; }
-
         .highlight {
             background: #fff3cd;
             border-left: 4px solid var(--accent);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .warning {
+            background: #ffe0e0;
+            border-left: 4px solid #d32f2f;
             padding: 1rem 1.5rem;
             margin: 1.5rem 0;
             border-radius: 0 6px 6px 0;
@@ -175,6 +171,18 @@
             font-size: 0.9rem;
             color: var(--text-muted);
             font-style: italic;
+        }
+
+        .diagram {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            overflow-x: auto;
         }
 
         footer {
@@ -197,60 +205,156 @@
             <span class="tag">Edge AI</span>
             <span class="tag">TensorRT</span>
             <span class="tag">Jetson</span>
+            <span class="tag">CUDA</span>
         </div>
 
-        <h1>YOLOv8 on Jetson Orin Nano: PyTorch to TensorRT</h1>
+        <h1>YOLOv8 on Jetson Orin Nano: From PyTorch to TensorRT INT8</h1>
 
         <p class="meta">
-            Hokwang Choi · April 2026 · 8 min read
+            Hokwang Choi · April 2026 · 12 min read
         </p>
 
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
-            <strong>Hardware:</strong> Jetson Orin Nano 8GB (67 TOPS in Super mode)<br>
-            <strong>Model:</strong> YOLOv8n, 640×640 input<br>
-            <strong>Best config:</strong> TensorRT FP16 — Xms latency, Y FPS<br>
-            <strong>Speedup:</strong> ~Nx over PyTorch baseline<br>
+            <strong>Hardware:</strong> Jetson Orin Nano 8GB + Samsung PRO Plus 256GB microSD<br>
+            <strong>Model:</strong> YOLOv8n, 640×640 input, batch size 1<br>
+            <strong>Measurement:</strong> GPU-only latency via CUDA events and trtexec<br>
+            <strong>Results:</strong> TensorRT INT8 achieves 4.9ms / 204 FPS (4.8× faster than PyTorch)<br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
-        <h2>The Problem: Edge Inference Performance</h2>
-
-        <p>
-            You have a vision model. You want to run it on the edge. The vendor says 
-            "67 TOPS!" but what does that mean for your actual workload?
-        </p>
-
-        <p>
-            I ran YOLOv8n through the full optimization pipeline on a Jetson Orin Nano to 
-            find out. This post covers the journey from PyTorch to TensorRT, with actual 
-            numbers at each step.
-        </p>
-
         <h2>Hardware Setup</h2>
+
+        <p>
+            The Jetson Orin Nano is NVIDIA's entry-level edge AI platform. I'm using the 8GB developer kit 
+            with external storage for model files and faster I/O.
+        </p>
 
         <table>
             <tr><td><strong>Device</strong></td><td>Jetson Orin Nano 8GB Developer Kit</td></tr>
             <tr><td><strong>GPU</strong></td><td>1024 CUDA cores, 32 Tensor Cores (Ampere)</td></tr>
-            <tr><td><strong>Memory</strong></td><td>8GB LPDDR5 unified CPU/GPU</td></tr>
+            <tr><td><strong>Memory</strong></td><td>8GB LPDDR5 unified (CPU + GPU shared)</td></tr>
+            <tr><td><strong>Storage</strong></td><td>Samsung PRO Plus 256GB microSD (160MB/s read)</td></tr>
+            <tr><td><strong>L4T Version</strong></td><td>36.4.7</td></tr>
             <tr><td><strong>JetPack</strong></td><td>6.2</td></tr>
-            <tr><td><strong>Power Mode</strong></td><td>MAXN SUPER (uncapped)</td></tr>
+            <tr><td><strong>TensorRT</strong></td><td>10.3</td></tr>
+            <tr><td><strong>CUDA</strong></td><td>12.6</td></tr>
         </table>
 
-        <h2>Benchmark Methodology</h2>
+        <h3>Power Configuration</h3>
 
-        <p>All benchmarks used:</p>
+        <p>
+            The Orin Nano supports multiple power modes. I use <strong>MAXN SUPER</strong> for benchmarking — 
+            this unlocks maximum GPU and memory clocks with no power cap.
+        </p>
+
+        <pre><code class="language-bash"># Set maximum performance mode
+sudo nvpmodel -m 0
+
+# Lock clocks to maximum frequency
+sudo jetson_clocks
+
+# Verify
+nvpmodel -q
+# NV Power Mode: MAXN</code></pre>
+
+        <p>
+            In production, you'd choose a power mode based on thermal/power budget. But for benchmarking, 
+            MAXN gives us the hardware's true capability.
+        </p>
+
+        <h2>What We Measure (And What We Don't)</h2>
+
+        <p>
+            Inference latency has multiple components. Most benchmarks conflate them — we don't.
+        </p>
+
+        <div class="diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Host Latency (end-to-end)                     │
+├──────────────┬──────────────────────────┬──────────────┬────────────┤
+│  Python      │    H2D Transfer          │  GPU Compute │    D2H     │
+│  Overhead    │  (Host → Device)         │  (Kernels)   │  Transfer  │
+├──────────────┼──────────────────────────┼──────────────┼────────────┤
+│  ~0.1-1ms    │    ~0.5ms                │   <b>⬅ THIS</b>    │   ~0.2ms   │
+└──────────────┴──────────────────────────┴──────────────┴────────────┘
+        </div>
+
+        <p>
+            We report <strong>GPU Compute Time only</strong> — the actual kernel execution. This excludes:
+        </p>
+
         <ul>
-            <li>500ms warmup period</li>
-            <li>10 second measurement window</li>
-            <li>Batch size 1 (real-time inference)</li>
-            <li>Input: 640×640 RGB</li>
+            <li><strong>Python overhead</strong> — interpreter, framework dispatch</li>
+            <li><strong>H2D transfer</strong> — copying input tensor to GPU memory</li>
+            <li><strong>D2H transfer</strong> — copying output tensor back to CPU</li>
         </ul>
 
         <p>
-            Metrics captured: latency (ms), throughput (FPS), GPU memory (MB), 
-            and power draw (W) via <code>tegrastats</code>.
+            Why? Because GPU compute is the optimization target. Transfers are fixed by data size; 
+            Python overhead vanishes in C++ deployment. Reporting end-to-end latency from Python 
+            would conflate things you can't optimize with things you can.
         </p>
+
+        <h3>Measurement Tools</h3>
+
+        <table>
+            <thead>
+                <tr><th>Runtime</th><th>Tool</th><th>What It Captures</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PyTorch</td>
+                    <td>CUDA Events</td>
+                    <td>GPU kernel execution only</td>
+                </tr>
+                <tr>
+                    <td>TensorRT</td>
+                    <td>trtexec <code>GPU Compute Time</code></td>
+                    <td>GPU kernel execution only</td>
+                </tr>
+                <tr>
+                    <td>Both</td>
+                    <td>Nsight Systems</td>
+                    <td>Per-kernel timing, memory ops, Tensor Core usage</td>
+                </tr>
+                <tr>
+                    <td>Power</td>
+                    <td>tegrastats</td>
+                    <td>System power draw during inference</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>CUDA Events for PyTorch</h3>
+
+        <p>
+            <code>time.perf_counter()</code> measures wall-clock time including CPU overhead. 
+            CUDA events record timestamps on the GPU timeline:
+        </p>
+
+        <pre><code class="language-python">start_event = torch.cuda.Event(enable_timing=True)
+end_event = torch.cuda.Event(enable_timing=True)
+
+start_event.record()
+output = model(input)
+end_event.record()
+
+torch.cuda.synchronize()
+gpu_time_ms = start_event.elapsed_time(end_event)  # GPU-only</code></pre>
+
+        <h3>trtexec Output</h3>
+
+        <p>
+            TensorRT's <code>trtexec</code> reports timing breakdown automatically:
+        </p>
+
+        <pre><code class="language-text">=== Performance summary ===
+Throughput: 90.5 qps
+Latency: min = 11.87 ms, max = 15.44 ms, mean = 12.09 ms  ← Host latency
+GPU Compute Time: min = 10.98 ms, mean = 11.04 ms         ← We report this
+H2D Latency: min = 0.39 ms, mean = 0.56 ms
+D2H Latency: min = 0.17 ms, mean = 0.24 ms</code></pre>
 
         <h2>Results</h2>
 
@@ -259,24 +363,29 @@
                 <tr>
                     <th>Runtime</th>
                     <th>Precision</th>
-                    <th>Latency (ms)</th>
+                    <th>GPU Latency</th>
                     <th>FPS</th>
-                    <th>Memory (MB)</th>
-                    <th>Power (W)</th>
+                    <th>TOPS</th>
+                    <th>Util%</th>
+                    <th>Power</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- RESULTS_PLACEHOLDER: Will be filled with actual benchmark data -->
-                <tr><td>PyTorch</td><td>FP32</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
-                <tr><td>TensorRT</td><td>FP32</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
-                <tr><td>TensorRT</td><td>FP16</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
-                <tr><td>TensorRT</td><td>INT8</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>PyTorch</td><td>FP32</td><td>23.69 ms</td><td>42</td><td>0.37</td><td>3.7%</td><td>9.4 W</td></tr>
+                <tr><td>TensorRT</td><td>FP32</td><td>11.04 ms</td><td>91</td><td>0.79</td><td>7.9%</td><td>10.9 W</td></tr>
+                <tr><td>TensorRT</td><td>FP16</td><td>6.13 ms</td><td>163</td><td>1.42</td><td>7.1%</td><td>10.2 W</td></tr>
+                <tr><td>TensorRT</td><td>INT8</td><td>4.90 ms</td><td>204</td><td>1.78</td><td>4.4%</td><td>9.1 W</td></tr>
             </tbody>
         </table>
 
+        <p>
+            <strong>TOPS</strong> = Achieved Tera Operations Per Second. <strong>Util%</strong> = percentage of 
+            hardware's theoretical peak (40 TOPS INT8, 20 TFLOPS FP16 on Orin Nano MAXN SUPER).
+        </p>
+
         <div class="figure">
-            <!-- CHART_PLACEHOLDER -->
-            <figcaption>Figure 1: Latency comparison across runtimes and precisions</figcaption>
+            <!-- CHART_PLACEHOLDER: Latency comparison chart -->
+            <figcaption>Figure 1: GPU latency across runtimes and precisions (lower is better)</figcaption>
         </div>
 
         <h2>The Optimization Pipeline</h2>
@@ -284,30 +393,42 @@
         <h3>Step 1: PyTorch Baseline</h3>
 
         <p>
-            Start with the Ultralytics YOLOv8n model. This is our baseline — no optimization, 
-            just PyTorch with CUDA.
+            Ultralytics provides a clean API. The model runs on GPU but with no inference optimization:
         </p>
 
         <pre><code class="language-python">from ultralytics import YOLO
 
 model = YOLO("yolov8n.pt")
-results = model.predict(source="bus.jpg")</code></pre>
+results = model.predict("image.jpg")</code></pre>
 
         <h3>Step 2: Export to ONNX</h3>
 
         <p>
-            ONNX is the intermediate representation. TensorRT consumes ONNX and produces 
-            an optimized engine.
+            ONNX is the intermediate representation. We export to ONNX for two reasons:
         </p>
 
-        <pre><code class="language-bash">yolo export model=yolov8n.pt format=onnx imgsz=640</code></pre>
+        <ul>
+            <li><strong>Visual inspection</strong> — open in <a href="https://netron.app">Netron</a> to explore layer structure</li>
+            <li><strong>TensorRT conversion</strong> — input format for building optimized engines</li>
+        </ul>
+
+        <pre><code class="language-bash">yolo export model=yolov8n.pt format=onnx imgsz=640 opset=17
+
+# Inspect with Netron (optional)
+# Upload yolov8n.onnx to https://netron.app</code></pre>
 
         <h3>Step 3: Build TensorRT Engines</h3>
 
         <p>
-            TensorRT performs layer fusion, kernel auto-tuning, and precision calibration. 
-            Each engine is hardware-specific — what's built on Orin Nano runs only on Orin Nano.
+            TensorRT compiles the ONNX graph into an optimized engine. This includes:
         </p>
+
+        <ul>
+            <li><strong>Layer fusion</strong> — Conv + BatchNorm + ReLU → single kernel</li>
+            <li><strong>Kernel auto-tuning</strong> — selects fastest implementation for your GPU</li>
+            <li><strong>Precision calibration</strong> — FP16/INT8 quantization</li>
+            <li><strong>Memory optimization</strong> — reuses buffers, minimizes allocations</li>
+        </ul>
 
         <pre><code class="language-bash"># FP32 — baseline TensorRT
 trtexec --onnx=yolov8n.onnx --saveEngine=yolov8n_fp32.engine
@@ -315,140 +436,286 @@ trtexec --onnx=yolov8n.onnx --saveEngine=yolov8n_fp32.engine
 # FP16 — uses Tensor Cores
 trtexec --onnx=yolov8n.onnx --fp16 --saveEngine=yolov8n_fp16.engine
 
-# INT8 — requires calibration for production
+# INT8 — maximum compression
 trtexec --onnx=yolov8n.onnx --int8 --saveEngine=yolov8n_int8.engine</code></pre>
 
         <div class="highlight">
-            <strong>Note:</strong> INT8 without a calibration dataset uses simple min-max 
-            scaling. For production, provide representative images for better accuracy.
+            <strong>Note:</strong> Engines are hardware-specific. An engine built on Orin Nano 
+            won't run on Xavier or desktop GPUs. Rebuild for each target.
         </div>
 
-        <h3>Step 4: Benchmark Each Engine</h3>
-
-        <pre><code class="language-bash"># Run benchmark with trtexec
-trtexec --loadEngine=yolov8n_fp16.engine \
-        --batch=1 \
-        --warmUp=500 \
-        --duration=10 \
-        --avgRuns=100</code></pre>
-
-        <h2>Analysis</h2>
-
-        <h3>PyTorch → TensorRT FP32</h3>
+        <h2>Understanding FLOPs, TOPS, and Hardware Utilization</h2>
 
         <p>
-            Even without precision reduction, TensorRT provides significant speedup through 
-            kernel fusion and memory optimization. Convolution + BatchNorm + ReLU sequences 
-            become single fused kernels.
+            Vendors quote hardware performance in TOPS (Tera Operations Per Second). The Orin Nano 
+            claims <strong>40 TOPS INT8</strong> in MAXN SUPER mode. But what does that mean in practice?
         </p>
 
-        <h3>FP32 → FP16</h3>
+        <h3>FLOPs: Model Complexity</h3>
 
         <p>
-            FP16 enables Tensor Core utilization. The Orin Nano's 32 Tensor Cores are 
-            designed for mixed-precision workloads — FP16 compute with FP32 accumulation. 
-            Memory bandwidth is halved, and throughput roughly doubles.
+            <strong>FLOPs</strong> (Floating Point Operations) measures the computational work for one 
+            inference. It's a property of the model architecture, independent of hardware:
         </p>
 
-        <h3>FP16 → INT8</h3>
+        <ul>
+            <li>YOLOv8n @ 640×640: <strong>8.7 GFLOPs</strong></li>
+            <li>YOLOv8s: ~28 GFLOPs</li>
+            <li>YOLOv8m: ~79 GFLOPs</li>
+            <li>YOLOv8x: ~257 GFLOPs</li>
+        </ul>
 
         <p>
-            INT8 reduces memory footprint and can improve throughput further, but accuracy 
-            depends on calibration quality. For object detection, INT8 typically works well 
-            with minimal mAP loss.
+            A multiply-accumulate (MAC) counts as 2 FLOPs. Most of these operations come from 
+            convolutions: <code>FLOPs = 2 × Cin × Cout × K² × H × W</code>.
         </p>
 
-        <h2>Power Efficiency</h2>
+        <h3>TOPS: Achieved Throughput</h3>
 
         <p>
-            Edge deployment often cares about FPS-per-watt as much as raw FPS. 
-            I tested YOLOv8n FP16 across power modes:
+            <strong>TOPS</strong> measures how many operations per second the hardware actually executes:
         </p>
 
-        <table>
-            <thead>
-                <tr><th>Power Mode</th><th>TDP</th><th>FPS</th><th>FPS/Watt</th></tr>
-            </thead>
-            <tbody>
-                <!-- POWER_RESULTS_PLACEHOLDER -->
-                <tr><td>15W</td><td>15W</td><td>—</td><td>—</td></tr>
-                <tr><td>25W</td><td>25W</td><td>—</td><td>—</td></tr>
-                <tr><td>MAXN SUPER</td><td>~25W</td><td>—</td><td>—</td></tr>
-            </tbody>
-        </table>
+        <div class="diagram">
+TOPS = Model FLOPs / Latency (seconds) / 10¹²
+
+Example: YOLOv8n with 5ms latency
+TOPS = 8.7 × 10⁹ / 0.005 / 10¹² = 1.74 TOPS
+        </div>
+
+        <h3>Utilization: The Reality Check</h3>
+
+        <p>
+            <strong>Utilization</strong> compares achieved TOPS to hardware's theoretical peak:
+        </p>
+
+        <div class="diagram">
+Utilization = Achieved TOPS / Peak TOPS × 100%
+
+Orin Nano MAXN SUPER peaks:
+  - INT8:  40 TOPS
+  - FP16:  20 TFLOPS
+  - FP32:  ~10 TFLOPS (estimated)
+        </div>
+
+        <p>
+            Why is utilization typically <strong>low (5-20%)</strong>?
+        </p>
+
+        <ul>
+            <li><strong>Small models</strong> — YOLOv8n's 8.7 GFLOPs can't saturate 1024 CUDA cores</li>
+            <li><strong>Memory-bound ops</strong> — data transfer limits Tensor Core usage</li>
+            <li><strong>Kernel launch overhead</strong> — dominates for many small kernels</li>
+            <li><strong>Batch size 1</strong> — real-time inference can't batch for throughput</li>
+        </ul>
+
+        <p>
+            Utilization is a diagnostic tool: low utilization with acceptable latency is fine. 
+            Low utilization with poor latency suggests optimization opportunities — memory access 
+            patterns, kernel fusion, or larger batch sizes where applicable.
+        </p>
+
+        <h2>How Quantization Works</h2>
+
+        <h3>FP16: Tensor Core Acceleration</h3>
+
+        <p>
+            FP16 halves memory bandwidth and enables Tensor Cores — specialized matrix multiply 
+            units that compute 4×4 FP16 matrix ops in a single cycle. The Orin Nano has 32 Tensor Cores.
+        </p>
+
+        <p>
+            For most vision models, FP16 has <strong>no accuracy loss</strong>. The dynamic range 
+            (±65504) is sufficient for normalized image data and typical weight distributions.
+        </p>
+
+        <h3>INT8: Calibration Required</h3>
+
+        <p>
+            INT8 reduces precision from 32 bits to 8 bits — a 4× reduction. This requires 
+            mapping the FP32 value range to [-128, 127]:
+        </p>
+
+        <div class="diagram">
+FP32 range:  [-3.2, 4.1]  →  scale = 4.1/127 = 0.032
+                          →  INT8 = round(FP32 / scale)
+
+Example: 2.5 → round(2.5 / 0.032) = 78 (INT8)
+</div>
+
+        <p>
+            The <code>scale</code> factors are determined by <strong>calibration</strong> — running 
+            representative data through the network and measuring activation ranges.
+        </p>
+
+        <h3>TensorRT's Default INT8</h3>
+
+        <p>
+            Without a calibration dataset, <code>trtexec --int8</code> uses <strong>min-max calibration</strong>:
+        </p>
+
+        <ul>
+            <li>Assumes activations span [min, max] observed during a quick profiling pass</li>
+            <li>Works reasonably for many models</li>
+            <li>May lose accuracy on outlier-sensitive models</li>
+        </ul>
+
+        <p>
+            For production, provide calibration images:
+        </p>
+
+        <pre><code class="language-bash">trtexec --onnx=yolov8n.onnx --int8 \
+    --calib=calibration_images/ \
+    --saveEngine=yolov8n_int8_calibrated.engine</code></pre>
+
+        <h2>Power Monitoring with tegrastats</h2>
+
+        <p>
+            The benchmark script samples power during inference using <code>tegrastats</code>:
+        </p>
+
+        <pre><code class="language-bash"># Sample output
+RAM 3456/7620MB (lfb 1x1MB) SWAP 0/3810MB CPU [25%@1510,22%@1510,...]
+GR3D_FREQ 99% VDD_IN 8500mW VDD_CPU_GPU_CV 3200mW VDD_SOC 1800mW</code></pre>
+
+        <p>
+            Key fields:
+        </p>
+
+        <ul>
+            <li><code>GR3D_FREQ 99%</code> — GPU utilization (should be high during inference)</li>
+            <li><code>VDD_IN 8500mW</code> — Total system power draw</li>
+        </ul>
+
+        <p>
+            We sample at 100ms intervals during the benchmark window and report mean power. 
+            This is approximate — for precise energy measurement, use a power meter.
+        </p>
 
         <h2>Profiling with Nsight Systems</h2>
 
         <p>
-            To understand <em>why</em> FP16 is faster, profile with Nsight Systems:
+            For detailed kernel analysis, we generate Nsight Systems profiles:
         </p>
 
-        <pre><code class="language-bash">nsys profile --trace=cuda,nvtx \
-    trtexec --loadEngine=yolov8n_fp16.engine --batch=1 --duration=5</code></pre>
+        <pre><code class="language-bash">nsys profile --trace=cuda,nvtx -o yolov8_fp16 \
+    trtexec --loadEngine=yolov8n_fp16.engine --duration=5</code></pre>
 
         <p>
-            The trace shows Tensor Core kernels (names containing <code>hmma</code> or 
-            <code>imma</code>) dominating the GPU timeline, with minimal memory transfer overhead.
+            Open in Nsight Systems GUI:
         </p>
+
+        <pre><code class="language-bash">nsys-ui yolov8_fp16.nsys-rep</code></pre>
+
+        <p>
+            This reveals:
+        </p>
+
+        <ul>
+            <li>Which kernels dominate execution time</li>
+            <li>Tensor Core vs CUDA Core utilization</li>
+            <li>Memory transfer overlap with compute</li>
+            <li>Idle gaps between kernels</li>
+        </ul>
 
         <div class="figure">
             <!-- NSIGHT_SCREENSHOT_PLACEHOLDER -->
-            <figcaption>Figure 2: Nsight Systems trace showing Tensor Core kernel execution</figcaption>
+            <figcaption>Figure 2: Nsight Systems trace showing kernel execution timeline</figcaption>
         </div>
 
-        <h2>Practical Considerations</h2>
-
-        <h3>Memory Management</h3>
+        <h2>Further Optimization: CUDA Programming</h2>
 
         <p>
-            The Orin Nano has 8GB unified memory. Running the desktop environment consumes 
-            ~1-2GB. For maximum memory headroom:
+            After TensorRT INT8, what's left? Custom CUDA kernels for operations TensorRT doesn't optimize.
         </p>
 
-        <pre><code class="language-bash"># Drop to multi-user (no GUI)
-sudo systemctl isolate multi-user.target
-
-# Clear filesystem cache
-sudo sysctl -w vm.drop_caches=3</code></pre>
-
-        <h3>Thermal Throttling</h3>
+        <h3>1. Fused Pre/Post-Processing</h3>
 
         <p>
-            Sustained inference can cause thermal throttling. Monitor with <code>jtop</code> 
-            and ensure adequate cooling. The stock heatsink works for burst inference; 
-            active cooling helps for continuous workloads.
+            Image preprocessing (resize, normalize, channel reorder) typically runs on CPU. 
+            A custom CUDA kernel can fuse these into a single GPU pass:
         </p>
 
-        <h3>Engine Portability</h3>
+        <pre><code class="language-cpp">__global__ void preprocessKernel(
+    const uint8_t* input,   // HWC uint8 [0,255]
+    float* output,          // CHW float [0,1] normalized
+    int H, int W
+) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= W || y >= H) return;
+    
+    // BGR → RGB, uint8 → float, normalize
+    int idx = y * W + x;
+    output[0 * H * W + idx] = input[idx * 3 + 2] / 255.0f;  // R
+    output[1 * H * W + idx] = input[idx * 3 + 1] / 255.0f;  // G
+    output[2 * H * W + idx] = input[idx * 3 + 0] / 255.0f;  // B
+}</code></pre>
+
+        <h3>2. GPU-Accelerated NMS</h3>
 
         <p>
-            TensorRT engines are not portable across GPU architectures. An engine built on 
-            Orin Nano (Ampere) won't run on Xavier (Volta). Rebuild for each target.
+            Non-Maximum Suppression (NMS) is often a CPU bottleneck. NVIDIA provides 
+            <code>efficientNMSPlugin</code> for TensorRT, but custom implementations can 
+            further optimize for specific IoU thresholds and box counts.
+        </p>
+
+        <h3>3. Stream Pipelining</h3>
+
+        <p>
+            Overlap data transfer with compute using CUDA streams:
+        </p>
+
+        <pre><code class="language-cpp">cudaStream_t stream1, stream2;
+cudaStreamCreate(&stream1);
+cudaStreamCreate(&stream2);
+
+// Pipeline: while frame N computes, frame N+1 transfers
+cudaMemcpyAsync(d_input1, h_frame1, size, cudaMemcpyHostToDevice, stream1);
+context->enqueueV3(stream1);  // Inference on frame 1
+
+cudaMemcpyAsync(d_input2, h_frame2, size, cudaMemcpyHostToDevice, stream2);
+// Frame 2 transfer overlaps with frame 1 inference</code></pre>
+
+        <h3>4. Kernel Profiling</h3>
+
+        <p>
+            Use Nsight Compute for kernel-level optimization:
+        </p>
+
+        <pre><code class="language-bash">ncu --set full -o profile trtexec --loadEngine=yolov8n_int8.engine</code></pre>
+
+        <p>
+            This shows occupancy, memory throughput, and instruction mix per kernel — 
+            essential for identifying optimization opportunities.
         </p>
 
         <h2>Conclusion</h2>
 
-        <p>Key takeaways:</p>
         <ul>
-            <li><strong>TensorRT FP16</strong> is the sweet spot — Tensor Core acceleration 
-                with no accuracy loss</li>
-            <li><strong>INT8</strong> offers additional gains but requires proper calibration</li>
-            <li><strong>Power efficiency</strong> is excellent — real-time object detection 
-                at under 15W is achievable</li>
-            <li><strong>Memory</strong> is the constraint — optimize for memory when deploying 
-                larger models</li>
+            <li><strong>TensorRT FP16</strong> is the sweet spot — Tensor Core acceleration with no accuracy loss</li>
+            <li><strong>INT8</strong> provides further gains but requires calibration for accuracy-sensitive applications</li>
+            <li><strong>GPU-only latency</strong> is what matters — don't conflate with Python overhead</li>
+            <li><strong>Nsight Systems</strong> is essential for understanding where time goes</li>
+            <li><strong>Custom CUDA</strong> unlocks the last 10-20% via fused preprocessing and GPU NMS</li>
         </ul>
 
         <h2>Reproduce It</h2>
 
         <pre><code class="language-bash">git clone https://github.com/hokwangchoi/jetson-orin-nano-benchmarks.git
 cd jetson-orin-nano-benchmarks/vision-benchmarks/scripts
-pip3 install ultralytics
+
+# Install dependencies
+pip3 install ultralytics numpy
+
+# Run benchmark
 python3 benchmark_yolov8.py</code></pre>
 
         <p>
-            Results are saved to <code>assets/results/</code> as JSON.
+            Results are saved to <code>assets/results/</code>. Nsight profiles are in 
+            <code>assets/results/nsight_profiles/</code>.
         </p>
+
     </article>
 
     <footer>
@@ -459,5 +726,6 @@ python3 benchmark_yolov8.py</code></pre>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
 </body>
 </html>
