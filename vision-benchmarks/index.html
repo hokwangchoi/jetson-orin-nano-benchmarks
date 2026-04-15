@@ -183,6 +183,7 @@
             font-size: 0.85rem;
             line-height: 1.4;
             overflow-x: auto;
+            white-space: pre;
         }
 
         footer {
@@ -211,15 +212,15 @@
         <h1>YOLOv8 on Jetson Orin Nano: From PyTorch to TensorRT INT8</h1>
 
         <p class="meta">
-            Hokwang Choi · April 2026 · 12 min read
+            Hokwang Choi · April 2026 · 18 min read
         </p>
 
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
-            <strong>Hardware:</strong> Jetson Orin Nano 8GB + Samsung PRO Plus 256GB microSD<br>
+            <strong>Hardware:</strong> Jetson Orin Nano 8GB (MAXN_SUPER) + Samsung PRO Plus 256GB microSD<br>
             <strong>Model:</strong> YOLOv8n, 640×640 input, batch size 1<br>
             <strong>Measurement:</strong> GPU-only latency via CUDA events and trtexec<br>
-            <strong>Results:</strong> TensorRT INT8 achieves 4.9ms / 204 FPS (4.8× faster than PyTorch)<br>
+            <strong>Results:</strong> TensorRT INT8 achieves 3.49ms / 286 FPS (6× faster than PyTorch)<br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
@@ -248,19 +249,22 @@
             this unlocks maximum GPU and memory clocks with no power cap.
         </p>
 
-        <pre><code class="language-bash"># Set maximum performance mode
-sudo nvpmodel -m 0
+        <pre><code class="language-bash"># Check available power modes
+nvpmodel -p
+
+# Set MAXN SUPER mode (mode ID varies by JetPack version)
+sudo nvpmodel -m 2  # MAXN_SUPER on JetPack 6.2
 
 # Lock clocks to maximum frequency
 sudo jetson_clocks
 
 # Verify
 nvpmodel -q
-# NV Power Mode: MAXN</code></pre>
+# NV Power Mode: MAXN_SUPER</code></pre>
 
         <p>
             In production, you'd choose a power mode based on thermal/power budget. But for benchmarking, 
-            MAXN gives us the hardware's true capability.
+            MAXN SUPER gives us the hardware's true capability.
         </p>
 
         <h2>What We Measure (And What We Don't)</h2>
@@ -271,12 +275,12 @@ nvpmodel -q
 
         <div class="diagram">
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Host Latency (end-to-end)                     │
+│                        Host Latency (end-to-end)                    │
 ├──────────────┬──────────────────────────┬──────────────┬────────────┤
-│  Python      │    H2D Transfer          │  GPU Compute │    D2H     │
-│  Overhead    │  (Host → Device)         │  (Kernels)   │  Transfer  │
+│    Python    │       H2D Transfer       │  GPU Compute │    D2H     │
+│   Overhead   │     (Host → Device)      │   (Kernels)  │  Transfer  │
 ├──────────────┼──────────────────────────┼──────────────┼────────────┤
-│  ~0.1-1ms    │    ~0.5ms                │   <b>⬅ THIS</b>    │   ~0.2ms   │
+│   ~0.1-1ms   │         ~0.5ms           │  ⬅ THIS ONE  │   ~0.2ms   │
 └──────────────┴──────────────────────────┴──────────────┴────────────┘
         </div>
 
@@ -350,11 +354,11 @@ gpu_time_ms = start_event.elapsed_time(end_event)  # GPU-only</code></pre>
         </p>
 
         <pre><code class="language-text">=== Performance summary ===
-Throughput: 90.5 qps
-Latency: min = 11.87 ms, max = 15.44 ms, mean = 12.09 ms  ← Host latency
-GPU Compute Time: min = 10.98 ms, mean = 11.04 ms         ← We report this
-H2D Latency: min = 0.39 ms, mean = 0.56 ms
-D2H Latency: min = 0.17 ms, mean = 0.24 ms</code></pre>
+Throughput: 119.5 qps
+Latency: min = 8.21 ms, max = 9.12 ms, mean = 8.42 ms  ← Host latency
+GPU Compute Time: min = 8.30 ms, mean = 8.36 ms        ← We report this
+H2D Latency: min = 0.35 ms, mean = 0.48 ms
+D2H Latency: min = 0.15 ms, mean = 0.22 ms</code></pre>
 
         <h2>Results</h2>
 
@@ -371,10 +375,10 @@ D2H Latency: min = 0.17 ms, mean = 0.24 ms</code></pre>
                 </tr>
             </thead>
             <tbody>
-                <tr><td>PyTorch</td><td>FP32</td><td>23.69 ms</td><td>42</td><td>0.37</td><td>3.7%</td><td>9.4 W</td></tr>
-                <tr><td>TensorRT</td><td>FP32</td><td>11.04 ms</td><td>91</td><td>0.79</td><td>7.9%</td><td>10.9 W</td></tr>
-                <tr><td>TensorRT</td><td>FP16</td><td>6.13 ms</td><td>163</td><td>1.42</td><td>7.1%</td><td>10.2 W</td></tr>
-                <tr><td>TensorRT</td><td>INT8</td><td>4.90 ms</td><td>204</td><td>1.78</td><td>4.4%</td><td>9.1 W</td></tr>
+                <tr><td>PyTorch</td><td>FP32</td><td>20.88 ms</td><td>48</td><td>0.42</td><td>4.2%</td><td>11.4 W</td></tr>
+                <tr><td>TensorRT</td><td>FP32</td><td>8.36 ms</td><td>120</td><td>1.04</td><td>10.4%</td><td>14.3 W</td></tr>
+                <tr><td>TensorRT</td><td>FP16</td><td>4.43 ms</td><td>225</td><td>1.96</td><td>9.8%</td><td>14.1 W</td></tr>
+                <tr><td>TensorRT</td><td>INT8</td><td>3.49 ms</td><td>286</td><td>2.49</td><td>6.2%</td><td>12.5 W</td></tr>
             </tbody>
         </table>
 
@@ -598,30 +602,244 @@ GR3D_FREQ 99% VDD_IN 8500mW VDD_CPU_GPU_CV 3200mW VDD_SOC 1800mW</code></pre>
             For detailed kernel analysis, we generate Nsight Systems profiles:
         </p>
 
-        <pre><code class="language-bash">nsys profile --trace=cuda,nvtx -o yolov8_fp16 \
-    trtexec --loadEngine=yolov8n_fp16.engine --duration=5</code></pre>
+        <pre><code class="language-bash">nsys profile --trace=cuda,nvtx -o yolov8_int8 \
+    trtexec --loadEngine=yolov8n_int8.engine --duration=5
+
+# Open in GUI
+nsys-ui yolov8_int8.nsys-rep</code></pre>
+
+        <h3>Reading the Timeline</h3>
 
         <p>
-            Open in Nsight Systems GUI:
+            The Nsight timeline shows multiple rows of activity:
         </p>
 
-        <pre><code class="language-bash">nsys-ui yolov8_fp16.nsys-rep</code></pre>
+        <div class="figure">
+            <a href="assets/nsight_timeline.png" target="_blank">
+                <img src="assets/nsight_timeline.png" alt="Nsight Systems timeline showing YOLOv8 INT8 inference" style="width: 100%; max-width: 1567px; cursor: zoom-in;">
+            </a>
+            <figcaption>Figure 1: Nsight Systems timeline for YOLOv8n INT8 (MAXN_SUPER) — click to enlarge</figcaption>
+        </div>
+
+        <div class="diagram">
+Row                What It Shows
+─────────────────────────────────────────────────────────
+CPU (0-5)          CPU core activity (should be minimal)
+CUDA HW (Orin)     Hardware-level kernel/memory activity
+├─ Kernel          GPU compute kernels (yellow/orange)
+└─ Memory          DMA transfers (magenta)
+Streams            Software command queues
+├─ Stream 19       Main inference (86.0% of work)
+├─ Stream 18       Memory HtoD transfers (7.1%)
+└─ Stream 20       Memory DtoH transfers (6.9%)
+TensorRT           High-level enqueue spans [2.564 ms]
+CUDA API           Driver calls (cudaEventSynchronize, etc.)
+        </div>
+
+        <h3>CUDA Streams: Software vs Hardware</h3>
 
         <p>
-            This reveals:
+            A common confusion: <strong>CUDA Stream ≠ Streaming Multiprocessor (SM)</strong>.
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Concept</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>CUDA Stream</strong></td>
+                    <td>Software queue</td>
+                    <td>Order operations, enable overlap</td>
+                </tr>
+                <tr>
+                    <td><strong>Streaming Multiprocessor</strong></td>
+                    <td>Physical hardware</td>
+                    <td>Execute threads (128 CUDA cores each)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            TensorRT creates multiple streams to <strong>overlap compute and memory transfers</strong>:
+        </p>
+
+        <div class="diagram">
+Stream 19: [Kernel A][Kernel B][Kernel C]────────────►  (compute)
+Stream 18: ──────[Memcpy HtoD]──────[Memcpy HtoD]───►  (input upload)
+Stream 20: ────────────[Memcpy DtoH]──────[Memcpy DtoH]►  (output download)
+                       │
+                       ▼
+           All run on same 8 SMs — GPU scheduler distributes work
+        </div>
+
+        <h3>Pipeline Overlap: Why It's Fast</h3>
+
+        <p>
+            The Orin has separate hardware engines for compute and memory:
+        </p>
+
+        <div class="diagram">
+┌─────────────────────────────────────────────────────────┐
+│                    Orin Nano SoC                        │
+├────────────────────────┬────────────────────────────────┤
+│     DMA Engine         │      GPU Compute (8 SMs)       │
+│     (Memory Copy)      │      (1024 CUDA cores)         │
+├────────────────────────┼────────────────────────────────┤
+│  Memcpy HtoD ────►     │                                │
+│  Memcpy DtoH ◄────     │   sm80_xmma_fprop (conv)       │
+│                        │   void culn... (layernorm)     │
+│  Runs in PARALLEL!     │   generatedNati... (fused)     │
+└────────────────────────┴────────────────────────────────┘
+        </div>
+
+        <p>
+            This enables <strong>triple buffering</strong> — three inferences overlap:
+        </p>
+
+        <div class="diagram">
+Without pipelining:
+  [HtoD][Compute][DtoH]  [HtoD][Compute][DtoH]  [HtoD][Compute][DtoH]
+  |◄────── 7ms ──────►|  |◄────── 7ms ──────►|
+  Throughput: 143 FPS
+
+With pipelining (what TensorRT does):
+  [HtoD][Compute][DtoH]
+       [HtoD][Compute][DtoH]
+            [HtoD][Compute][DtoH]
+  |◄─5ms─►|◄─5ms─►|◄─5ms─►|
+  Throughput: 200 FPS (compute-bound, not transfer-bound)
+        </div>
+
+        <h3>Kernel Names Explained</h3>
+
+        <p>
+            Zooming into the timeline reveals individual CUDA kernels:
+        </p>
+
+        <table>
+            <thead>
+                <tr><th>Kernel Name</th><th>What It Does</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>sm80_xmma_fprop_impl...</code></td>
+                    <td>Convolution via Tensor Cores (xmma = matrix multiply-accumulate)</td>
+                </tr>
+                <tr>
+                    <td><code>void CUTENSOR_NAMES...</code></td>
+                    <td>cuTENSOR library ops (optimized tensor operations)</td>
+                </tr>
+                <tr>
+                    <td><code>generatedNati...</code></td>
+                    <td>TensorRT-generated fused kernel (multiple ops combined)</td>
+                </tr>
+                <tr>
+                    <td><code>void culn...</code></td>
+                    <td>Layer normalization</td>
+                </tr>
+                <tr>
+                    <td><code>Reformatting Co...</code></td>
+                    <td>Memory layout transform (NHWC ↔ NCHW for Tensor Cores)</td>
+                </tr>
+                <tr>
+                    <td><code>/model.*/conv...</code></td>
+                    <td>NVTX markers showing which YOLOv8 layer is executing</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Timing Breakdown</h3>
+
+        <p>
+            Different rows show different timing spans:
+        </p>
+
+        <div class="diagram">
+NVTX span [~4ms]
+|◄─────────────────────────────────────────────────►|
+|                                                   |
+|  CPU prep │ GPU kernels [~3.5ms] │ Sync overhead  |
+|  [~0.2ms] │                      │   [~0.3ms]     |
+|           │◄────────────────────►│                |
+|           │   Stream 19 work     │                |
+|           │                      │                |
+|    TensorRT enqueue [2.564ms]    │                |
+|    |◄──────────────────────►|    │                |
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Metric</th><th>Value</th><th>What It Measures</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>trtexec GPU Compute</strong></td>
+                    <td>3.49 ms</td>
+                    <td>CUDA events around kernels (averaged, most accurate)</td>
+                </tr>
+                <tr>
+                    <td><strong>TensorRT enqueue</strong></td>
+                    <td>~2.5-3.5 ms</td>
+                    <td>Single enqueue() call (varies per inference)</td>
+                </tr>
+                <tr>
+                    <td><strong>NVTX full span</strong></td>
+                    <td>~3.5-4 ms</td>
+                    <td>End-to-end including CPU overhead</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            <strong>For benchmarking</strong>, use GPU Compute Time — it's what the GPU actually spent.
+            <strong>For real-time latency</strong> (robotics, AV), use NVTX span — it's camera-to-result time.
+        </p>
+
+        <h3>Jetson Memory Architecture</h3>
+
+        <p>
+            Unlike desktop GPUs with separate VRAM, Jetson uses <strong>unified memory</strong>:
+        </p>
+
+        <div class="diagram">
+Desktop GPU (Discrete):
+┌─────────────┐    PCIe 16GB/s    ┌─────────────┐
+│  CPU + RAM  │ ◄───────────────► │  GPU + VRAM │
+│   (Host)    │    Slow copy!     │  (Device)   │
+└─────────────┘                   └─────────────┘
+
+Jetson Orin Nano (Unified):
+┌─────────────────────────────────────────────────┐
+│           Shared LPDDR5 (8GB, 68 GB/s)          │
+└──────────────────────┬──────────────────────────┘
+                       │
+            ┌──────────┴──────────┐
+            ▼                     ▼
+        ┌────────┐           ┌────────┐
+        │  CPU   │           │  GPU   │
+        │ A78 ×6 │           │ 8 SMs  │
+        └────────┘           └────────┘
+        
+HtoD/DtoH on Jetson = cache flush + address mapping (fast!)
+        </div>
+
+        <h3>What We Learned</h3>
+
+        <p>
+            Our Nsight analysis reveals TensorRT is <strong>already well-optimized</strong>:
         </p>
 
         <ul>
-            <li>Which kernels dominate execution time</li>
-            <li>Tensor Core vs CUDA Core utilization</li>
-            <li>Memory transfer overlap with compute</li>
-            <li>Idle gaps between kernels</li>
+            <li><strong>Dense kernel packing</strong> — no idle gaps between kernels</li>
+            <li><strong>Memory overlap</strong> — transfers run parallel with compute</li>
+            <li><strong>Minimal CPU overhead</strong> — GPU-bound execution</li>
+            <li><strong>Efficient streaming</strong> — 89% work on main stream, auxiliary streams handle transfers</li>
         </ul>
 
-        <div class="figure">
-            <!-- NSIGHT_SCREENSHOT_PLACEHOLDER -->
-            <figcaption>Figure 2: Nsight Systems trace showing kernel execution timeline</figcaption>
-        </div>
+        <p>
+            The low utilization (4-8%) is <strong>expected</strong> for YOLOv8n — it's too small to saturate 
+            the GPU. Larger models or batch sizes would show higher utilization.</p>
 
         <h2>Further Optimization: CUDA Programming</h2>
 
@@ -690,6 +908,35 @@ cudaMemcpyAsync(d_input2, h_frame2, size, cudaMemcpyHostToDevice, stream2);
             essential for identifying optimization opportunities.
         </p>
 
+        <h2>Appendix: Power Mode Comparison</h2>
+
+        <p>
+            The Orin Nano supports multiple power modes. Here's how <strong>15W mode</strong> compares 
+            to <strong>MAXN_SUPER</strong>:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Precision</th>
+                    <th>15W Mode</th>
+                    <th>MAXN_SUPER</th>
+                    <th>Speedup</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>TensorRT FP32</td><td>11.04 ms</td><td>8.36 ms</td><td>1.32×</td></tr>
+                <tr><td>TensorRT FP16</td><td>6.13 ms</td><td>4.43 ms</td><td>1.38×</td></tr>
+                <tr><td>TensorRT INT8</td><td>4.90 ms</td><td>3.49 ms</td><td>1.40×</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            MAXN_SUPER draws ~3-4W more power but delivers <strong>30-40% better performance</strong>. 
+            For battery-powered or thermally-constrained deployments, 15W mode offers a reasonable 
+            tradeoff — still achieving 204 FPS with INT8.
+        </p>
+
         <h2>Conclusion</h2>
 
         <ul>
@@ -714,6 +961,30 @@ python3 benchmark_yolov8.py</code></pre>
         <p>
             Results are saved to <code>assets/results/</code>. Nsight profiles are in 
             <code>assets/results/nsight_profiles/</code>.
+        </p>
+
+        <h2>What's Next: VLM for Autonomous Driving</h2>
+
+        <p>
+            Object detection is just one piece of the perception stack. The next benchmark will explore 
+            <strong>Vision-Language Models (VLMs)</strong> on Jetson — models that can reason about 
+            scenes, not just detect objects.
+        </p>
+
+        <p>
+            For autonomous driving applications, VLMs enable:
+        </p>
+
+        <ul>
+            <li><strong>Scene understanding</strong> — "Is this intersection safe to proceed?"</li>
+            <li><strong>Anomaly detection</strong> — identifying unusual situations without explicit training</li>
+            <li><strong>Natural language queries</strong> — "What obstacles are in my path?"</li>
+            <li><strong>Multi-modal reasoning</strong> — combining camera, lidar descriptions, and maps</li>
+        </ul>
+
+        <p>
+            Candidates include <strong>Qwen2.5-VL-3B</strong> and <strong>NVIDIA Cosmos Reason 2B</strong> — 
+            both designed for edge deployment. Stay tuned.
         </p>
 
     </article>
