@@ -30,7 +30,7 @@ YOLOv8 object detection across the full optimization pipeline:
 - FP32, FP16, INT8 precision comparison
 - Power efficiency analysis across power modes
 
-**[Read the blog post →](./vision-benchmarks/index.html)**
+**[Read the blog post →](https://hokwangchoi.com/blog/vision-benchmarks/)**
 
 ### [Vision Language Models](./vlm-benchmarks/)
 
