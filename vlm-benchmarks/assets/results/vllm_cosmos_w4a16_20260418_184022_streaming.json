@@ -1,0 +1,172 @@
+{
+  "runtime_label": "vllm_cosmos_w4a16",
+  "model": "embedl/Cosmos-Reason2-2B-W4A16",
+  "url": "http://localhost:8000",
+  "n_runs": 5,
+  "n_warmup": 3,
+  "temperature": 0.0,
+  "text_prompt": "Describe a pedestrian crossing scene in an autonomous driving context. Include vehicles, pedestrians, signals, and potential hazards.",
+  "image_prompt": "Describe this image in 3 sentences. Focus only on what you can actually see.",
+  "image_path": "assets/images/bus.jpg",
+  "max_tokens_text": 128,
+  "max_tokens_image": 128,
+  "text_results": [
+    {
+      "ttft_ms": 60.78856600106519,
+      "tpot_ms": 17.358593992115157,
+      "tps": 56.500697905885396,
+      "output_tokens": 128,
+      "wall_s": 2.2654587420001917,
+      "run": 1
+    },
+    {
+      "ttft_ms": 61.15116600085457,
+      "tpot_ms": 17.358524448813057,
+      "tps": 56.491863519691115,
+      "output_tokens": 128,
+      "wall_s": 2.265813022000657,
+      "run": 2
+    },
+    {
+      "ttft_ms": 60.3722679989005,
+      "tpot_ms": 17.363356307092673,
+      "tps": 56.49595041400199,
+      "output_tokens": 128,
+      "wall_s": 2.265649113998734,
+      "run": 3
+    },
+    {
+      "ttft_ms": 63.05383600010828,
+      "tpot_ms": 17.36318774015586,
+      "tps": 56.43001082524677,
+      "output_tokens": 128,
+      "wall_s": 2.2682965700005298,
+      "run": 4
+    },
+    {
+      "ttft_ms": 60.89778400018986,
+      "tpot_ms": 17.37451097637751,
+      "tps": 56.447550504045154,
+      "output_tokens": 128,
+      "wall_s": 2.2675917529995786,
+      "run": 5
+    }
+  ],
+  "text_summary": {
+    "ttft_ms": {
+      "median": 60.89778400018986,
+      "mean": 61.25272400022368,
+      "min": 60.3722679989005,
+      "max": 63.05383600010828,
+      "n": 5
+    },
+    "tpot_ms": {
+      "median": 17.36318774015586,
+      "mean": 17.36363469291085,
+      "min": 17.358524448813057,
+      "max": 17.37451097637751,
+      "n": 5
+    },
+    "tps": {
+      "median": 56.491863519691115,
+      "mean": 56.473214633774084,
+      "min": 56.43001082524677,
+      "max": 56.500697905885396,
+      "n": 5
+    },
+    "output_tokens": {
+      "median": 128,
+      "mean": 128,
+      "min": 128,
+      "max": 128,
+      "n": 5
+    },
+    "wall_s": {
+      "median": 2.265813022000657,
+      "mean": 2.2665618401999383,
+      "min": 2.2654587420001917,
+      "max": 2.2682965700005298,
+      "n": 5
+    }
+  },
+  "image_results": [
+    {
+      "ttft_ms": 513.5766719995445,
+      "tpot_ms": 18.362672359999124,
+      "tps": 42.61798321330921,
+      "output_tokens": 101,
+      "wall_s": 2.3698915900004067,
+      "run": 1
+    },
+    {
+      "ttft_ms": 77.70026899925142,
+      "tpot_ms": 18.36607596000249,
+      "tps": 52.23045223146566,
+      "output_tokens": 101,
+      "wall_s": 1.9337378039999749,
+      "run": 2
+    },
+    {
+      "ttft_ms": 76.43607800127938,
+      "tpot_ms": 18.370230620002985,
+      "tps": 52.25906127183986,
+      "output_tokens": 101,
+      "wall_s": 1.932679186000314,
+      "run": 3
+    },
+    {
+      "ttft_ms": 77.11766300053569,
+      "tpot_ms": 18.368105449990253,
+      "tps": 52.24563969905631,
+      "output_tokens": 101,
+      "wall_s": 1.9331756789997598,
+      "run": 4
+    },
+    {
+      "ttft_ms": 76.51022400023066,
+      "tpot_ms": 18.366328760002943,
+      "tps": 52.266288305916305,
+      "output_tokens": 101,
+      "wall_s": 1.932411948000663,
+      "run": 5
+    }
+  ],
+  "image_summary": {
+    "ttft_ms": {
+      "median": 77.11766300053569,
+      "mean": 164.26818120016833,
+      "min": 76.43607800127938,
+      "max": 513.5766719995445,
+      "n": 5
+    },
+    "tpot_ms": {
+      "median": 18.366328760002943,
+      "mean": 18.36668262999956,
+      "min": 18.362672359999124,
+      "max": 18.370230620002985,
+      "n": 5
+    },
+    "tps": {
+      "median": 52.24563969905631,
+      "mean": 50.32388494431747,
+      "min": 42.61798321330921,
+      "max": 52.266288305916305,
+      "n": 5
+    },
+    "output_tokens": {
+      "median": 101,
+      "mean": 101,
+      "min": 101,
+      "max": 101,
+      "n": 5
+    },
+    "wall_s": {
+      "median": 1.9331756789997598,
+      "mean": 2.0203792414002235,
+      "min": 1.932411948000663,
+      "max": 2.3698915900004067,
+      "n": 5
+    }
+  },
+  "timestamp": "2026-04-18T18:40:22.246466"
+}
