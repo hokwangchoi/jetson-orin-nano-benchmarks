@@ -15,6 +15,7 @@ vlm-benchmarks/assets/results/nsight_profiles/*.qdrep
 *.safetensors
 *.bin
 *.plan
+*.pt
 
 # Node modules, if any tooling lands later
 node_modules/
