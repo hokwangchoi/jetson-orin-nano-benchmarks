@@ -15,11 +15,11 @@ Each benchmark includes:
 
 | Spec | Value |
 |------|-------|
-| **Device** | Jetson Orin Nano 8GB Developer Kit |
+| **Device** | Jetson Orin Nano 8GB Developer Kit (Super) |
 | **GPU** | 1024 CUDA cores, 32 Tensor Cores (Ampere, SM 8.7) |
 | **Memory** | 8GB LPDDR5 unified (CPU + GPU), 68 GB/s |
 | **AI Performance** | 40 TOPS / 67 TOPS (Super mode, MAXN_SUPER) |
-| **JetPack** | 6.2 (L4T 36.4.7) |
+| **JetPack** | 6.2.2 (L4T 36.5.0), upgraded from 6.2.1 mid-project — see VLM post |
 
 ## Benchmarks
 
@@ -34,19 +34,25 @@ YOLOv8 object detection across the full optimization pipeline:
 
 ### [Vision Language Models](./vlm-benchmarks/) — 🚧 in progress
 
-Running a 2B-parameter VLM on 8GB unified memory, comparing two inference
-runtimes on the same model at INT4 weights:
-- **Model**: Cosmos-Reason2-2B (Qwen3-VL-2B post-trained for physical reasoning)
-- **Quantization**: INT4 weights (Q4_K_M GGUF for llama.cpp; W4A16 AWQ for
-  TRT Edge-LLM) — different schemes, both standard for their runtime
-- **Runtimes**: llama.cpp (ggml C runtime, hand-tuned CUDA kernels) vs
-  TensorRT Edge-LLM (C++ runtime, fused TRT kernels, CUDA graphs)
-- **Metrics**: TTFT, TPOT, TPS, CPU + GPU utilization, VDD power rails,
-  peak/steady-state memory, Nsight kernel traces
-- **Angle**: robotics and AV perception workloads — what does it take to put
-  a reasoning VLM on a deployed edge platform?
+A 2B-parameter VLM on 8GB unified memory, across three inference
+runtimes. Intended as a straight comparison on the same model
+(Cosmos-Reason2-2B); ended up as a case study in platform fragility.
 
-**[Read the WIP →](./vlm-benchmarks/)**
+- **Model**: Cosmos-Reason2-2B (Qwen3-VL-2B post-trained for physical reasoning)
+- **Runtimes**: llama.cpp (ggml C runtime) vs vLLM (PyTorch + PagedAttention)
+  vs TensorRT Edge-LLM (C++, fused TRT kernels)
+- **What happened**: JetPack 6.2.1 shipped with an NvMap memory-allocation
+  bug that blocked vLLM and TRT-Edge-LLM in different ways. NVIDIA
+  released a partial fix (JetPack 6.2.2). vLLM now works with a
+  community-quantized W4A16 checkpoint (Embedl) and NVIDIA's
+  memory-constrained serve config. TRT-Edge-LLM on Cosmos-2B is still
+  blocked.
+- **Metrics**: TTFT, TPOT, TPS, peak/steady-state memory
+- **Angle**: robotics and AV perception workloads — what does it
+  actually take to deploy a production inference runtime on a 2026 edge
+  platform?
+
+**[Read the blog post →](./vlm-benchmarks/index.html)**
 
 ## Quick Start
 
@@ -64,8 +70,8 @@ cd vision-benchmarks/scripts
 pip3 install ultralytics
 python3 benchmark_yolov8.py
 
-# VLM benchmarks (see vlm-benchmarks/README.md — requires x86 host for
-# quantization, then Jetson for inference)
+# VLM benchmarks — see vlm-benchmarks/README.md and vlm-benchmarks/device/README.md.
+# Requires JetPack 6.2.2 or later. Upgrade instructions in device/README.md.
 ```
 
 ## Results at a Glance
@@ -79,14 +85,19 @@ python3 benchmark_yolov8.py
 | TensorRT | FP16      |      4.43ms |   226 FPS  |                — |
 | TensorRT | INT8      |      3.49ms |   287 FPS  |                — |
 
-### VLM Inference (pending)
+### VLM Inference (Orin Nano 8GB, MAXN_SUPER, JetPack 6.2.2)
 
-| Runtime          | Model                  | TTFT | TPOT | TPS | Mem | CPU | GPU |
-|------------------|------------------------|-----:|-----:|----:|----:|----:|----:|
-| llama.cpp        | Cosmos-Reason2-2B-Q4_K_M |    — |    — |   — |   — |   — |   — |
-| TRT Edge-LLM     | Cosmos-Reason2-2B-W4A16 |    — |    — |   — |   — |   — |   — |
+| Runtime          | Model                | Quant    | Context | TTFT (text) | TTFT (img) | TPOT | TPS |
+|------------------|----------------------|----------|--------:|------------:|-----------:|-----:|----:|
+| llama.cpp        | Cosmos-Reason2-2B    | Q4_K_M   |    4096 |       58 ms |     306 ms |27 ms |  38 |
+| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  256 |           — |      — | — |  16 |
+| TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|     256 |   *blocked* |  *blocked* |    — |   — |
 
-*Results filled in as benchmarks complete.*
+*vLLM TPS is wall-clock (includes prefill). Streaming TTFT/TPOT captured
+via `benchmarks/bench_vllm.py`.*
+*TRT Edge-LLM + Cosmos-2B: blocked on NvMap/Myelin bug, see
+[`vlm-benchmarks/notes/trt_edgellm_cosmos_blocker.md`](./vlm-benchmarks/notes/trt_edgellm_cosmos_blocker.md).
+Retry planned when NVIDIA patches the upstream issue.*
 
 ## Repository Structure
 
@@ -101,12 +112,19 @@ python3 benchmark_yolov8.py
 │       └── benchmark_yolov8.py
 └── vlm-benchmarks/              # in progress
     ├── README.md                # story, methodology, phase plan
-    ├── index.html               # blog post (draft)
+    ├── index.html               # blog post
     ├── host/                    # x86 host — quantization + ONNX export
     ├── device/                  # Jetson — runtime build + serving
-    ├── benchmarks/              # runtime-agnostic harness
+    │   ├── README.md            # JetPack upgrade, hardware setup
+    │   ├── scripts/             # 10_* llama.cpp, 20_* vLLM
+    │   └── configs/             # per-runtime env files
+    ├── benchmarks/              # runtime-agnostic harness + streaming bench
+    │   ├── harness.py           # full orchestrator (tegrastats, power, latency)
+    │   └── bench_vllm.py        # streaming TTFT/TPOT benchmark
+    ├── notes/                   # investigation writeups (blockers, retries)
     ├── analysis/                # plots + final writeup
     ├── assets/                  # inputs, results, profiles
+    │   └── results/             # raw JSON results, memory snapshots
     └── scripts/                 # v1 placeholder (superseded by benchmarks/)
 ```
 

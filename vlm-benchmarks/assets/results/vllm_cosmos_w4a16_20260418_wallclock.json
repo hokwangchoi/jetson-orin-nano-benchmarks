@@ -1,0 +1,52 @@
+{
+  "runtime": "vllm",
+  "runtime_version": "0.19.0",
+  "model": "embedl/Cosmos-Reason2-2B-W4A16",
+  "quantization": "W4A16 AWQ (weights INT4, activations FP16)",
+  "hardware": {
+    "device": "Jetson Orin Nano 8GB Developer Kit (Super)",
+    "jetpack": "6.2.2",
+    "l4t": "36.5.0",
+    "kernel": "5.15.185-tegra",
+    "power_mode": "MAXN_SUPER",
+    "boot_target": "multi-user.target (no GUI)"
+  },
+  "container": "ghcr.io/nvidia-ai-iot/vllm:latest-jetson-orin",
+  "serve_args": {
+    "max_model_len": 256,
+    "max_num_batched_tokens": 256,
+    "gpu_memory_utilization": 0.6,
+    "max_num_seqs": 1,
+    "enforce_eager": true,
+    "enable_chunked_prefill": true,
+    "limit_mm_per_prompt": {"image": 1, "video": 1},
+    "mm_processor_kwargs": {"num_frames": 2, "max_pixels": 150528}
+  },
+  "method": "wall-clock via curl (bash). Includes prefill, decode, and HTTP overhead. Streaming TTFT/TPOT not captured in this first pass — see bench_vllm.py for proper streaming measurement.",
+  "prompt_text": "Describe a pedestrian crossing scene in an autonomous driving context. Include vehicles, pedestrians, signals, and potential hazards.",
+  "temperature": 0.7,
+  "top_p": 0.8,
+  "top_k": 20,
+  "note_on_sampling": "vLLM applied embedl's generation_config.json defaults (temp=0.7, top_k=20, top_p=0.8). Not temperature=0; subsequent runs with deterministic sampling will differ slightly.",
+  "warmups_discarded": 3,
+  "runs": [
+    {"run": 1, "wall_s": 7.946913485, "prompt_tokens": 30, "output_tokens": 128, "wall_tps": 16.10},
+    {"run": 2, "wall_s": 7.847829237, "prompt_tokens": 30, "output_tokens": 128, "wall_tps": 16.31},
+    {"run": 3, "wall_s": 7.890194379, "prompt_tokens": 30, "output_tokens": 128, "wall_tps": 16.22},
+    {"run": 4, "wall_s": 7.868870178, "prompt_tokens": 30, "output_tokens": 128, "wall_tps": 16.26},
+    {"run": 5, "wall_s": 7.841998656, "prompt_tokens": 30, "output_tokens": 128, "wall_tps": 16.32}
+  ],
+  "summary": {
+    "median_wall_s": 7.869,
+    "median_wall_tps": 16.26,
+    "range_wall_tps": [16.10, 16.32],
+    "stddev_tps_pct": 0.5
+  },
+  "notes": [
+    "Wall TPS includes prefill (TTFT). True decode-only TPS is higher; bench_vllm.py streaming will separate TTFT and TPOT.",
+    "max_model_len=256 is hard constraint of this serve config. llama.cpp runs at ctx=4096 for comparison — asymmetry documented in blog.",
+    "Result is consistent with Embedl's reported 16-17 TPS on Orin Nano Super and AdwaitX independent measurement.",
+    "Image-input benchmark not captured in this first pass — ViT encoder path adds ~260 image tokens which eats context budget."
+  ],
+  "timestamp": "2026-04-18T20:36:25-04:00"
+}

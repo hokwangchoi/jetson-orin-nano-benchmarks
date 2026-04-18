@@ -1,70 +1,117 @@
 # Device-side workflow (Phase 1)
 
-Everything in this folder runs **on the Jetson Orin Nano 8 GB**, assuming
-you already completed Phase 0 (`../host/`) and transferred the artifact
-bundle.
+Everything in this folder runs **on the Jetson Orin Nano 8 GB**.
 
 ## Prerequisites
 
-- JetPack 6.2 (L4T 36.4.7), CUDA 12.6, TensorRT 10.x — all included.
-- MAXN_SUPER power mode, max clocks:
+- **JetPack 6.2.2 (L4T 36.5.0) or later.** If you're on 6.2.1
+  (L4T 36.4.7), upgrade first — see [JetPack upgrade](#jetpack-upgrade)
+  below. Running on 6.2.1 will block vLLM with an NvMap memory-allocation
+  bug and break TRT Edge-LLM engine builds.
+- CUDA 12.6, TensorRT 10.3 — included with JetPack 6.2.x.
+- MAXN_SUPER power mode and pinned clocks:
   ```bash
   sudo nvpmodel -m 2
   sudo jetson_clocks
   ```
-- TRT-Edge-LLM artifacts extracted (from Phase 0 host):
-  ```bash
-  mkdir -p ~/vlm-artifacts
-  tar -xzf ~/artifacts.tar.gz -C ~/vlm-artifacts/
-  ```
-- Docker + NVIDIA Container Toolkit (pre-installed with JetPack 6.2 but
-  confirm `docker info | grep nvidia`). Required for the llama.cpp path
-  which runs from NVIDIA's official Jetson container.
+- Docker + NVIDIA Container Toolkit (pre-installed with JetPack,
+  confirm `docker info | grep nvidia`). Required for the llama.cpp and
+  vLLM paths which run from official Jetson containers.
+
+## JetPack upgrade
+
+If `head -n1 /etc/nv_tegra_release` shows `REVISION: 4.7`, you need this.
+
+```bash
+# Back up the apt source
+sudo cp /etc/apt/sources.list.d/nvidia-l4t-apt-source.list{,.bak}
+
+# Change r36.4 → r36.5 in all deb lines
+sudo sed -i 's|r36.4|r36.5|g' /etc/apt/sources.list.d/nvidia-l4t-apt-source.list
+
+# Refresh + upgrade. Use dist-upgrade, not upgrade — kernel package must change.
+sudo apt update
+sudo apt dist-upgrade -y
+
+# Reboot to load the new kernel
+sudo reboot
+
+# After reboot, verify
+uname -r                       # should be 5.15.185-tegra (was 5.15.148)
+head -n1 /etc/nv_tegra_release # should show REVISION: 5.0
+```
+
+The upgrade downloads ~500 MB, takes ~20 minutes total (including
+reboot). Two config-file prompts during the install — answer `Y`
+(take the maintainer's version) for both: `nv-oem-config-post.sh` and
+`nvidia-l4t-apt-source.list`. Other prompts for files you haven't
+edited can be answered `Y` as well.
+
+## Memory hygiene
+
+On 8 GB unified memory you fight for headroom. Reasonable defaults:
+
+| Knob                       | llama.cpp            | vLLM                       |
+|----------------------------|----------------------|----------------------------|
+| Context / input            | `--ctx-size 4096`    | `--max-model-len 256`      |
+| GPU memory utilization     | n/a (auto)           | `0.6` (leaves room for OS) |
+| Parallel slots             | `--parallel 1`       | `--max-num-seqs 1`         |
+| KV cache                   | per slot, contiguous | paged, via PagedAttention  |
+| CUDA graphs                | n/a                  | disabled (`--enforce-eager`) |
+
+**Swap policy.** The default Jetson zram swap is ~3.7 GB, which is
+enough for normal use. For heavy tactic searches during TRT engine
+builds, add 8 GB of disk-backed swap on top:
+
+```bash
+sudo fallocate -l 8G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+Turn swap **off** during memory benchmarks to get clean peak-memory
+numbers (`sudo swapoff -a`), and **on** during production runs as a
+safety net for peak transients.
 
 ## Run order
 
 ```bash
 cd vlm-benchmarks/device/scripts
 
-./01_build_trtedgellm_runtime.sh  # TRT C++ runtime build on Jetson (~30-60 min, first time)
-./02_build_engines.sh             # llm_build + visual_build (~5-15 min)
-./10_prepare_llamacpp.sh          # download GGUF, merge splits, quantize to Q4_K_M (~15 min, one-time)
-./11_run_llamacpp_server.sh       # launches llama-server on :8000
-./04_smoketest.sh                 # one prompt to each runtime, sanity check
+# llama.cpp path
+./10_prepare_llamacpp.sh              # download GGUF, merge splits, quantize (~15 min, one-time)
+./11_run_llamacpp_server.sh           # launches llama-server on :8000
+
+# vLLM path (requires JetPack 6.2.2+)
+./20_run_vllm_cosmos.sh               # launches vLLM serve on :8000
 ```
 
-The TRT-Edge-LLM runtime is built once. Engines (`.engine`) files must be
-rebuilt if you change `--maxInputLen` or `--maxKVCacheCapacity`. The
-llama.cpp prep is also one-time — the quantized GGUF lives at
-`~/models/cosmos-reason2-2b/` and is reused across server runs.
+Only one server can listen on port 8000 at a time — stop the previous
+one before starting the next. Each script is idempotent and checks for
+existing outputs.
 
-## Memory budget cheat sheet
-
-On 8 GB unified memory you are fighting for headroom. Reasonable defaults:
-
-| Knob                       | llama.cpp            | TRT Edge-LLM           |
-|----------------------------|----------------------|------------------------|
-| Context / input            | `--ctx-size 4096`    | `--maxInputLen 1024`   |
-| GPU layer offload          | `--n-gpu-layers 99`  | n/a (all on GPU)       |
-| Parallel slots             | `--parallel 1`       | `--maxBatchSize 1`     |
-| KV cache capacity          | per slot, contiguous | `--maxKVCacheCapacity 4096` |
-
-If you hit OOM during engine build:
-```bash
-sudo sysctl -w vm.drop_caches=3    # free page cache
-# then drop --maxInputLen 512 --maxKVCacheCapacity 1024
-```
+TRT Edge-LLM on Cosmos-2B is currently blocked on an NvMap/Myelin issue
+in the TensorRT 10.3 autotuner; see
+[`../notes/trt_edgellm_cosmos_blocker.md`](../notes/trt_edgellm_cosmos_blocker.md)
+for the investigation.
 
 ## Profiling gotchas
 
-- **Disable ZRAM** for memory measurements:
-  ```bash
-  sudo swapoff -a
-  ```
-  otherwise peak memory numbers get confusing.
+- **Disable swap** for memory measurements (`sudo swapoff -a`);
+  otherwise peak-memory numbers include paged-out pages.
 - **tegrastats sampling interval**: default 1000 ms is fine for
   throughput runs; use `--interval 100` for capturing TTFT spikes.
-- **nsys on Jetson**: both TRT-Edge-LLM and llama-server are C++
-  binaries running inside containers. Profile with `nsys profile
-  --trace=cuda,osrt,nvtx` and attach by PID — see
+- **nsys on Jetson**: all three runtimes run as C++ binaries inside
+  containers. Profile with
+  `nsys profile --trace=cuda,osrt,nvtx` and attach by PID. See
   `../benchmarks/profiling/nsight_capture.sh`.
+- **Text-mode boot** frees ~100-200 MB of GPU memory that would
+  otherwise be held by the GNOME display compositor. For benchmarking
+  VLMs on an 8 GB board, the extra headroom matters:
+  ```bash
+  sudo systemctl set-default multi-user.target
+  sudo reboot
+  ```
+  To restore GUI: `sudo systemctl set-default graphical.target && sudo reboot`.

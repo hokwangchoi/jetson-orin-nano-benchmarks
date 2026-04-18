@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VLMs on Jetson Orin Nano: Fitting Vision-Language Models in 8GB — Hokwang Choi</title>
+    <title>Three runtimes, one platform bug: a VLM on Jetson Orin Nano — Hokwang Choi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -87,9 +87,7 @@
 
         p { margin-bottom: 1.25rem; }
 
-        ul, ol {
-            margin: 0 0 1.25rem 1.5rem;
-        }
+        ul, ol { margin: 0 0 1.25rem 1.5rem; }
         li { margin-bottom: 0.5rem; }
 
         a { color: var(--accent); text-decoration: none; }
@@ -118,6 +116,19 @@
             color: #e6e6e6;
         }
 
+        .ascii {
+            background: var(--code-bg);
+            color: #e6e6e6;
+            padding: 1.25rem 1.5rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78em;
+            line-height: 1.5;
+            white-space: pre;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -133,6 +144,7 @@
             background: var(--card-bg);
             font-weight: 600;
         }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
         .tldr {
             background: var(--card-bg);
@@ -143,13 +155,15 @@
         }
         .tldr strong { color: var(--heading); }
 
-        .highlight {
-            background: #fff3cd;
-            border-left: 4px solid var(--accent);
+        .pending {
+            background: #fff8d6;
+            border-left: 4px solid #d4a017;
             padding: 1rem 1.5rem;
             margin: 1.5rem 0;
             border-radius: 0 6px 6px 0;
+            font-size: 0.95rem;
         }
+        .pending strong { color: #704d00; }
 
         .warning {
             background: #ffe0e0;
@@ -157,22 +171,6 @@
             padding: 1rem 1.5rem;
             margin: 1.5rem 0;
             border-radius: 0 6px 6px 0;
-        }
-
-        .figure {
-            margin: 2rem 0;
-            text-align: center;
-        }
-        .figure img {
-            max-width: 100%;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-        }
-        .figure figcaption {
-            margin-top: 0.75rem;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            font-style: italic;
         }
 
         footer {
@@ -197,307 +195,430 @@
             <span class="tag">Jetson</span>
         </div>
 
-        <h1>VLMs on Jetson Orin Nano: Fitting Vision-Language Models in 8GB</h1>
+        <h1>Three runtimes, one platform bug: a VLM on Jetson Orin Nano</h1>
 
         <p class="meta">
-            Hokwang Choi · April 2026 · 10 min read
+            Hokwang Choi · April 2026 · 15 min read
         </p>
 
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
-            <strong>Challenge:</strong> Run VLMs on 8GB unified memory<br>
-            <strong>Models tested:</strong> Qwen2.5-VL-3B (INT4), Cosmos Reason 2B (FP8)<br>
-            <strong>Key metrics:</strong> TTFT, tokens/sec, peak memory<br>
-            <strong>Finding:</strong> Sub-4B models fit with aggressive quantization<br>
+            I set out to benchmark Cosmos-Reason2-2B, NVIDIA's physical-AI VLM, across three inference runtimes on a Jetson Orin Nano 8 GB: <strong>llama.cpp</strong>, <strong>vLLM</strong>, and <strong>TensorRT Edge-LLM</strong>.<br><br>
+            What actually happened: vLLM and TRT-Edge-LLM both got blocked by the same JetPack 6.2.1 memory-allocation bug, in two different ways. NVIDIA shipped a fix (JetPack 6.2.2 / L4T 36.5) mid-work that unblocked one of them. Getting vLLM serving required switching to a community-quantized W4A16 checkpoint and applying NVIDIA's documented memory-constrained configuration. TRT-Edge-LLM on this specific model is still blocked, pending an upstream fix.<br><br>
+            Final numbers: <strong>llama.cpp 38 TPS, vLLM 16 TPS</strong> on Cosmos-Reason2-2B. Both working runtimes hold the model at around 5-6 GB of 8 GB unified memory.<br><br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
-        <h2>The Challenge: VLMs on Edge Hardware</h2>
+        <h2>1. Why this comparison</h2>
 
         <p>
-            Vision-Language Models are transforming what's possible with AI — they understand 
-            images and generate text. But they're memory-hungry. A typical 7B VLM needs 14GB+ 
-            in FP16, and we only have 8GB.
+            VLMs are showing up in robotics and autonomous-vehicle stacks as the "brain" that turns a scene into grounded reasoning. The interesting models are small now — 2B to 4B parameters, multimodal, post-trained for physical reasoning. The interesting hardware is cheap edge silicon — Jetson Orin Nano is $250, 8 GB unified memory, 67 TOPS.
         </p>
-
         <p>
-            Can we run VLMs on the Jetson Orin Nano? Yes — but it requires careful model 
-            selection and aggressive quantization.
+            I wanted to know what the actual cost of moving one of these models onto one of these boards looks like in 2026. Not TOPS-on-paper, not Hopper numbers — just: set up the hardware, pick a model, run it, measure.
         </p>
 
-        <h2>Memory Budget</h2>
-
-        <p>The Orin Nano has 8GB unified memory shared between CPU and GPU:</p>
+        <h2>2. The hardware budget</h2>
 
         <table>
-            <tr><td>Total RAM</td><td>8192 MB</td></tr>
-            <tr><td>System/OS</td><td>~800 MB</td></tr>
-            <tr><td>Desktop (GNOME)</td><td>~1200 MB</td></tr>
-            <tr><td><strong>Available for model</strong></td><td><strong>~6000 MB</strong></td></tr>
+            <tr><td>Device</td><td>Jetson Orin Nano 8 GB Developer Kit (Super)</td></tr>
+            <tr><td>GPU</td><td>Ampere, SM 8.7, 1024 CUDA cores + 32 tensor cores</td></tr>
+            <tr><td>Memory</td><td>8 GB LPDDR5 unified @ 68 GB/s (CPU + GPU share)</td></tr>
+            <tr><td>AI performance</td><td>67 TOPS in MAXN_SUPER mode</td></tr>
+            <tr><td>JetPack (start)</td><td>6.2.1 (L4T 36.4.7)</td></tr>
+            <tr><td>JetPack (end)</td><td>6.2.2 (L4T 36.5) — upgraded mid-project, see §8</td></tr>
         </table>
 
         <p>
-            With the desktop running, we have ~6GB. Kill the GUI and we get ~7GB. 
-            That's our ceiling.
+            8 GB of unified memory is the hard constraint. Your weights, your KV cache, your vision encoder activations, and the Linux desktop all share the same physical DRAM. Every byte matters.
         </p>
 
-        <h2>Model Selection</h2>
+        <h2>3. The model: Cosmos-Reason2-2B</h2>
 
         <p>
-            VLM memory is dominated by the LLM decoder. A 7B model in FP16 needs 14GB — 
-            way over budget. We need smaller models with quantization:
+            <a href="https://huggingface.co/nvidia/Cosmos-Reason2-2B">NVIDIA's Cosmos-Reason2-2B</a> is a Qwen3-VL-2B architecture post-trained with SFT and RL on embodied-reasoning datasets. It's the right size for an 8 GB board when quantized, and it outputs chain-of-thought in an explicit <code>&lt;think&gt;...&lt;/think&gt;&lt;answer&gt;...&lt;/answer&gt;</code> format which makes evaluation tractable.
+        </p>
+        <p>
+            It's also the model NVIDIA's own VLM tutorials point at for Jetson. The 2B variant is the one that fits; the 8B is for AGX Thor and above.
         </p>
 
+        <h2>4. The original plan</h2>
+
+        <p>Three C++-native runtimes on the same model, same hardware, same prompts.</p>
+
         <table>
-            <thead>
-                <tr>
-                    <th>Model</th>
-                    <th>Parameters</th>
-                    <th>FP16 Size</th>
-                    <th>INT4 Size</th>
-                    <th>Fits?</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Runtime</th><th>Role</th><th>Quantization</th></tr></thead>
             <tbody>
-                <tr>
-                    <td>LLaVA-1.5-7B</td>
-                    <td>7B</td>
-                    <td>14 GB</td>
-                    <td>~4 GB</td>
-                    <td>Tight</td>
-                </tr>
-                <tr>
-                    <td>Qwen2.5-VL-3B</td>
-                    <td>3B</td>
-                    <td>6 GB</td>
-                    <td>~2 GB</td>
-                    <td>✓</td>
-                </tr>
-                <tr>
-                    <td>Cosmos Reason 2B</td>
-                    <td>2B</td>
-                    <td>4 GB</td>
-                    <td>~1.5 GB</td>
-                    <td>✓</td>
-                </tr>
+                <tr><td>llama.cpp</td><td>Generic, hackable, hand-tuned ggml-cuda kernels</td><td>Q4_K_M GGUF (on-device)</td></tr>
+                <tr><td>vLLM</td><td>Production serving, PagedAttention, PyTorch-backed</td><td>BF16 initially, then W4A16 AWQ</td></tr>
+                <tr><td>TRT Edge-LLM</td><td>NVIDIA's C++ runtime for embedded automotive/robotics</td><td>W4A16 AWQ (host-side)</td></tr>
             </tbody>
         </table>
 
         <p>
-            I focused on <strong>Qwen2.5-VL-3B</strong> and <strong>Cosmos Reason 2B</strong> — 
-            both designed for efficiency while maintaining strong vision-language capabilities.
+            The angle is "what's it like to deploy a production runtime on an edge platform in 2026." Not "which is fastest" — that question is boring when one of them won't start.
         </p>
 
-        <h2>Benchmark Methodology</h2>
+        <h2>5. Rabbit hole 1: vLLM won't initialize</h2>
 
-        <h3>Metrics</h3>
+        <p>
+            First attempt. Pull the NVIDIA-AI-IOT vLLM container, load the model, watch PyTorch crash on startup:
+        </p>
 
-        <ul>
-            <li><strong>TTFT</strong> — Time to first token. How long until generation starts?</li>
-            <li><strong>Tokens/sec</strong> — Generation throughput</li>
-            <li><strong>Peak memory</strong> — Maximum GPU memory during inference</li>
-            <li><strong>Power</strong> — Average power draw</li>
-        </ul>
+        <pre><code class="language-text">NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+Error : NVML_SUCCESS == r INTERNAL ASSERT FAILED at
+  "/opt/pytorch/pytorch/c10/cuda/CUDACachingAllocator.cpp":838</code></pre>
 
-        <h3>Test Setup</h3>
+        <p>
+            That first line is the kernel driver rejecting a GPU memory allocation. PyTorch's CUDA caching allocator queries NVML to plan its memory budget; when NVML's free-memory answer disagrees with what the driver will actually hand out, PyTorch asserts and dies.
+        </p>
+        <p>
+            Searching the error turns up <a href="https://forums.developer.nvidia.com/t/unable-to-allocate-cuda0-buffer-after-updating-ubuntu-packages/347862">a large and very active NVIDIA forum thread</a>. A moderator acknowledged this in November 2025: "This issue is related to the r36.4.7 update and has a failure rate." The underlying cause is a security patch (CVE-2025-33182) that changed how NvMap — the Tegra-specific memory subsystem — accounts contiguous CUDA allocations. A lot of workloads that used to work now fail.
+        </p>
+        <p>
+            At this point I had two paths: invest in debugging vLLM's allocator interaction, or pivot to a comparison that actually runs. I pivoted.
+        </p>
 
-        <ul>
-            <li>Input: 384×384 image + short prompt ("Describe this image in detail")</li>
-            <li>Output: 100 tokens generated</li>
-            <li>Warmup: 2 inference passes</li>
-            <li>Measured: 10 passes, averaged</li>
-        </ul>
+        <h2>6. Pivot: llama.cpp + TRT Edge-LLM</h2>
 
-        <h2>Results</h2>
+        <p>
+            llama.cpp doesn't use PyTorch's allocator or query NVML. It uses raw <code>cudaMalloc</code> in small chunks as layers execute. That allocation pattern sidesteps the bug. Within a few hours it was serving.
+        </p>
 
-        <table id="vlm-results">
+        <h3>llama.cpp: what worked</h3>
+
+        <p>Concrete setup:</p>
+
+        <pre><code class="language-bash"># On the Jetson, via NVIDIA's official llama.cpp container
+# Model: robertzty/Cosmos-Reason2-2B-GGUF (BF16 split + mmproj)
+# Merge splits, quantize BF16 → Q4_K_M (~1.1 GB)
+
+sudo docker run --rm --runtime=nvidia --network host \
+    -v ~/models/cosmos-reason2-2b:/models:ro \
+    ghcr.io/nvidia-ai-iot/llama_cpp:latest-jetson-orin \
+    llama-server \
+        --model   /models/Cosmos-Reason2-2B-Q4_K_M.gguf \
+        --mmproj  /models/mmproj-Cosmos-Reason2-2B-BF16.gguf \
+        --ctx-size 4096 \
+        --n-gpu-layers 99 \
+        --parallel 1 \
+        --flash-attn on \
+        --jinja</code></pre>
+
+        <p>
+            Headless boot, <code>sudo nvpmodel -m 2 && sudo jetson_clocks</code> for MAXN_SUPER, 11 GB swap as a safety net. Serving on port 8000 in ~8 seconds from cold start (mmap-friendly GGUF).
+        </p>
+
+        <h3>llama.cpp: numbers</h3>
+
+        <table>
             <thead>
                 <tr>
-                    <th>Model</th>
-                    <th>Precision</th>
+                    <th>Workload</th>
                     <th>TTFT (ms)</th>
-                    <th>Tokens/s</th>
-                    <th>Memory (MB)</th>
-                    <th>Power (W)</th>
+                    <th>TPOT (ms)</th>
+                    <th>TPS</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- VLM_RESULTS_PLACEHOLDER -->
-                <tr><td>Qwen2.5-VL-3B</td><td>INT4</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
-                <tr><td>Cosmos Reason 2B</td><td>FP8</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Text only, 100-token prompt → 128 tokens</td><td class="num">58</td><td class="num">27</td><td class="num">38</td></tr>
+                <tr><td>Text + image (384×384), same output</td><td class="num">306</td><td class="num">28</td><td class="num">37</td></tr>
             </tbody>
         </table>
 
-        <div class="figure">
-            <!-- RESULTS_CHART_PLACEHOLDER -->
-            <figcaption>Figure 1: VLM inference performance comparison</figcaption>
-        </div>
-
-        <h2>Deployment Options</h2>
-
-        <h3>Option 1: Jetson AI Lab + llama.cpp</h3>
-
         <p>
-            The <a href="https://www.jetson-ai-lab.com/">Jetson AI Lab</a> provides optimized 
-            containers. For VLMs, <code>llama.cpp</code> with GGUF models is the most 
-            memory-efficient option:
+            Numbers are the median of 10 runs after 2 warmup passes, MAXN_SUPER, text-mode boot (no GUI), swap disabled for clean measurement. TTFT for the image case is 248 ms more than the text case — that's the ViT vision-encoder pass. TPOT is essentially identical between the two modes, which matches theory: once you're in the decode loop, the image tokens are just more prefix in the KV cache.
         </p>
 
-        <pre><code class="language-bash"># Pull the container
-docker pull dustynv/llama-cpp:r36.4.0
-
-# Run with GPU
-docker run --runtime nvidia -it --rm \
-    -v ~/models:/models \
-    dustynv/llama-cpp:r36.4.0
-
-# Inside container
-./llama-cli -m /models/qwen2.5-vl-3b-q4.gguf \
-    --image /path/to/image.jpg \
-    -p "Describe this image"</code></pre>
-
-        <h3>Option 2: TensorRT-LLM</h3>
+        <h3>Concurrency sweep</h3>
 
         <p>
-            For maximum performance, TensorRT-LLM provides optimized inference. However, 
-            VLM support is still maturing:
+            llama.cpp's <code>--parallel N</code> slot pool shares a single model instance across N concurrent requests. I swept 1, 2, 4:
         </p>
 
-        <pre><code class="language-bash"># Build engine (on Jetson)
-python build.py --model_dir ./qwen2.5-vl-3b \
-    --dtype float16 \
-    --use_weight_only \
-    --weight_only_precision int4</code></pre>
-
-        <div class="warning">
-            <strong>Warning:</strong> TensorRT-LLM build times on Jetson are long (1-2 hours). 
-            Consider cross-compiling on a workstation if iteration speed matters.
-        </div>
-
-        <h3>Option 3: ExLlamaV2</h3>
+        <table>
+            <thead><tr><th>--parallel</th><th>Mean TTFT (ms)</th><th>Mean TPOT (ms)</th><th>Aggregate TPS</th></tr></thead>
+            <tbody>
+                <tr><td class="num">1</td><td class="num">58</td><td class="num">27</td><td class="num">38</td></tr>
+                <tr><td class="num">2</td><td class="num">115</td><td class="num">29</td><td class="num">70</td></tr>
+                <tr><td class="num">4</td><td class="num">231</td><td class="num">34</td><td class="num">59</td></tr>
+            </tbody>
+        </table>
 
         <p>
-            ExLlamaV2 offers excellent quantization with good performance on consumer hardware:
+            TTFT scales roughly linearly with parallelism (expected — prefills serialize through the attention kernels). TPOT degrades gracefully up to 2-way. 4-way is already memory-bandwidth-starved; aggregate TPS doesn't improve over 2-way for this model on this hardware.
         </p>
 
-        <pre><code class="language-python">from exllamav2 import ExLlamaV2, ExLlamaV2Config
-
-config = ExLlamaV2Config()
-config.model_dir = "./qwen2.5-vl-3b-exl2"
-config.max_seq_len = 2048
-
-model = ExLlamaV2(config)
-model.load()</code></pre>
-
-        <h2>Memory Optimization Techniques</h2>
-
-        <h3>1. Kill the Desktop</h3>
-
-        <pre><code class="language-bash"># Switch to text mode
-sudo systemctl isolate multi-user.target
-
-# Back to desktop later
-sudo systemctl isolate graphical.target</code></pre>
-
-        <p>This frees ~1.2GB immediately.</p>
-
-        <h3>2. Clear Caches</h3>
-
-        <pre><code class="language-bash">sudo sysctl -w vm.drop_caches=3</code></pre>
-
-        <h3>3. Use Flash Attention</h3>
+        <h2>7. Rabbit hole 2: TRT Edge-LLM hits the same wall, from a different angle</h2>
 
         <p>
-            If your framework supports it, Flash Attention reduces memory for long sequences. 
-            Critical for VLMs processing high-resolution images.
+            <a href="https://github.com/NVIDIA/TensorRT-Edge-LLM">TRT Edge-LLM</a> is NVIDIA's C++-native inference runtime for embedded platforms. The workflow is:
         </p>
 
-        <h3>4. Streaming Decode</h3>
+        <div class="ascii">HuggingFace checkpoint
+        │
+        ▼
+┌─────────────────────────┐
+│ quantize-llm  (on host) │  INT4 AWQ, ModelOpt, ~4 min on A40
+└───────────┬─────────────┘
+            ▼
+┌─────────────────────────┐
+│ export-llm    (on host) │  → ONNX + external weights
+│ export-visual (on host) │  → ViT encoder ONNX
+└───────────┬─────────────┘
+            ▼  (~2 GB scp to Jetson)
+┌─────────────────────────┐
+│ llm_build     (Jetson)  │  ONNX → TRT engine (THIS IS WHERE IT BREAKS)
+│ visual_build  (Jetson)  │  hardware-specific tactics
+└───────────┬─────────────┘
+            ▼
+┌─────────────────────────┐
+│ llm_inference (Jetson)  │  JSON input, CUDA-graph-captured execution
+└─────────────────────────┘</div>
 
         <p>
-            Generate tokens one at a time rather than batching. Trades throughput for lower 
-            peak memory — necessary when you're at the edge of capacity.
+            Host-side quantize and ONNX export ran fine on an A40 pod. Runtime build on the Jetson took ~40 minutes but succeeded. Engine build is where things died:
         </p>
 
-        <h2>Use Case: Driving Scene Understanding</h2>
+        <pre><code class="language-text">[INFO] Timing Runner: {ForeignNode[/Unsqueeze.../Cast]} (Myelin[0x80000023])
+[INFO] MemUsageChange: CPU 2380 MB, GPU 3710 MB
+NvMapMemAllocInternalTagged: 1075072515 error 12   (12 retries)
+[ERROR] CUDA error 2 for 622329856-byte allocation
+[ERROR] Could not find any implementation for node {ForeignNode[/Unsqueeze.../Cast]}.
+[ERROR] Failed to build LLM engine.</code></pre>
 
         <p>
-            I tested with driving scene images from nuScenes. The prompt:
+            Same kernel driver, same error signature, different codepath. This isn't PyTorch's NVML assertion — TRT uses raw <code>cudaMalloc</code> through its autotuner. The specific request that fails is exactly 1,075,072,515 bytes (~1 GiB) for a fused "Myelin" subgraph that implements rotary position embeddings. TRT retries 12 times, then falls back to asking for 622 MB — which also fails because by then the memory context is wedged.
         </p>
 
-        <pre><code>"You are an autonomous vehicle perception system. 
-Describe the scene: identify vehicles, pedestrians, 
-traffic signs, and potential hazards."</code></pre>
-
-        <div class="figure">
-            <!-- DRIVING_SCENE_PLACEHOLDER -->
-            <figcaption>Figure 2: Example driving scene analysis with Qwen2.5-VL-3B</figcaption>
-        </div>
-
-        <h3>Sample Output</h3>
-
-        <pre><code>The scene shows a four-lane urban road during daytime. 
-Ahead: a white sedan (approx 30m), a delivery truck in 
-the right lane (approx 50m). Left lane is clear. 
-Traffic light ahead shows green. Pedestrian on right 
-sidewalk, not crossing. No immediate hazards detected.</code></pre>
-
-        <p>
-            Generation took ~X seconds for ~80 tokens. Not real-time, but useful for 
-            logging, annotation, or second-opinion systems.
-        </p>
-
-        <h2>Lessons Learned</h2>
-
-        <h3>VLMs are Memory-Bound</h3>
-
-        <p>
-            Unlike vision models where compute is the bottleneck, VLM inference on Jetson 
-            is entirely memory-bound. Quantization is mandatory, not optional.
-        </p>
-
-        <h3>Vision Encoder Matters</h3>
-
-        <p>
-            The vision encoder (often ViT-based) needs memory too. Qwen2.5-VL's dynamic 
-            resolution handling is elegant but increases memory for large images. Resize 
-            inputs to 384×384 or smaller.
-        </p>
-
-        <h3>TTFT Dominates User Experience</h3>
-
-        <p>
-            For interactive applications, time-to-first-token matters more than tokens/sec. 
-            Users perceive 2-second TTFT as "slow" even if throughput is decent.
-        </p>
-
-        <h2>Conclusion</h2>
+        <h3>What I tried, what didn't work</h3>
 
         <ul>
-            <li><strong>Sub-4B VLMs</strong> fit on Orin Nano with INT4/INT8 quantization</li>
-            <li><strong>~6GB</strong> is the practical memory budget with desktop running</li>
-            <li><strong>llama.cpp</strong> with GGUF is the simplest deployment path</li>
-            <li><strong>Driving scene understanding</strong> works but isn't real-time</li>
+            <li><strong>Reduce <code>--maxInputLen</code> / <code>--maxKVCacheCapacity</code></strong>. The kernel-level allocation cap is contiguous-size, not total-memory; shrinking the model's working set doesn't help if a single fused kernel still needs 1 GB of scratch space for tactic selection.</li>
+            <li><strong>Patch <code>builderUtils.cpp</code> to set <code>kWORKSPACE</code> pool limit.</strong> Accepted by the TensorRT API, ignored by Myelin — the pool limit binds a different codepath.</li>
+            <li><strong>Patch to set <code>kTACTIC_DRAM</code> limit.</strong> Must be a power of 2. Still didn't bind the failing allocation.</li>
+            <li><strong>Re-export with <code>--trt_native_ops</code></strong>, which decomposes the Edge-LLM custom attention plugin into stock ONNX ops. The resulting ONNX has an <code>Attention</code> op that TensorRT 10.3's ONNX parser can't consume. Dead end.</li>
+            <li><strong>Free as much memory as possible before build</strong> (headless boot, stop docker/snapd/jtop, drop caches). Got to 6.9 GB available. Build still failed at the same allocation — confirming the issue is contiguous-size, not total-memory.</li>
         </ul>
 
         <p>
-            The Jetson Orin Nano isn't an LLM powerhouse, but it can run useful VLM inference 
-            for edge applications where cloud connectivity is limited or latency matters.
+            At this point the diagnosis is clear: the Myelin subgraph in TRT 10.3 wants one specific 1 GB contiguous allocation, and L4T 36.4.7's NvMap refuses it. Same underlying bug as vLLM's failure, surfacing in a completely different codepath.
         </p>
 
-        <h2>Reproduce It</h2>
+        <h2>8. The breakthrough: NVIDIA ships a fix</h2>
+
+        <p>
+            Mid-investigation, NVIDIA released JetPack 6.2.2 with L4T 36.5.0. The release notes explicitly call out a critical CUDA memory allocation problem introduced in 6.2.1 and describe it as the highest-priority fix in the release.
+        </p>
+
+        <p>Upgrade path is apt, not a reflash:</p>
+
+        <pre><code class="language-bash"># Edit /etc/apt/sources.list.d/nvidia-l4t-apt-source.list:
+#   r36.4 → r36.5 in all deb lines
+sudo apt update
+sudo apt dist-upgrade -y
+sudo reboot</code></pre>
+
+        <p>
+            Kernel jumps from 5.15.148-tegra to 5.15.185-tegra. CUDA stack rebuilds initramfs, bootloader slot swaps, first boot takes ~3 minutes.
+        </p>
+
+        <h3>What the fix does and doesn't</h3>
+
+        <p>
+            After upgrade, I reran the probes and both runtimes:
+        </p>
+
+        <table>
+            <thead><tr><th>Workload</th><th>L4T 36.4.7</th><th>L4T 36.5.0</th></tr></thead>
+            <tbody>
+                <tr><td>Bare <code>cudaMalloc</code> 1 GB contiguous</td><td>OK</td><td>OK</td></tr>
+                <tr><td>PyTorch + NVML allocator init (tiny tensor)</td><td style="color:#d32f2f">FAIL</td><td style="color:#2e7d32">OK</td></tr>
+                <tr><td>vLLM load BF16 Cosmos-2B → profile_run</td><td style="color:#d32f2f">FAIL (startup)</td><td style="color:#d32f2f">FAIL (multimodal profiling)</td></tr>
+                <tr><td>vLLM load W4A16 Cosmos-2B → serve</td><td>not tried</td><td style="color:#2e7d32">OK (§9)</td></tr>
+                <tr><td>TRT Edge-LLM engine build, Myelin subgraph</td><td style="color:#d32f2f">FAIL</td><td style="color:#d32f2f">FAIL</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            <strong>The fix is partial.</strong> L4T 36.5 resolves the tiny-allocation NVML path, so PyTorch can initialize. But loading a 5 GB BF16 model still triggers a variant of the same bug at the multimodal profiling stage — the ViT positional-embedding path asks for a contiguous 1 GB allocation and gets the same rejection. TRT-Edge-LLM's Myelin autotuner hits the same wall.
+        </p>
+
+        <h2>9. After the fix: vLLM, but only with W4A16</h2>
+
+        <p>
+            Two shifts were required to get vLLM actually serving:
+        </p>
+
+        <ol>
+            <li>
+                <strong>Model swap.</strong> The raw <code>nvidia/Cosmos-Reason2-2B</code> at BF16 is ~5 GB of weights plus PyTorch allocator overhead — it loads, but dies at multimodal profiling where the encoder cache allocates on top of loaded weights. I switched to <a href="https://huggingface.co/embedl/Cosmos-Reason2-2B-W4A16"><code>embedl/Cosmos-Reason2-2B-W4A16</code></a>, a community-quantized W4A16 AWQ version that takes 2.29 GB of GPU memory. Embedl is a small edge-AI company in Sweden; their port sidesteps the problem by shrinking the weight footprint enough that the rest of the pipeline has room to breathe.
+            </li>
+            <li>
+                <strong>Match NVIDIA's Orin Super Nano config.</strong> <a href="https://huggingface.co/blog/nvidia/cosmos-on-jetson">NVIDIA's own deployment blog</a> publishes a specific recipe for the Orin Nano Super — <code>max-model-len 256</code>, <code>enforce-eager</code>, <code>gpu-memory-utilization 0.65</code>, multimodal pixel cap of 150528, <code>max-num-seqs 1</code>. These aren't suggestions; they're the configuration that fits in 8 GB.
+            </li>
+        </ol>
+
+        <p>Final working command:</p>
+
+        <pre><code class="language-bash">sudo docker run --rm --runtime=nvidia --network host \
+    --shm-size=8g --ulimit memlock=-1 --ulimit stack=67108864 \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    -e HF_HOME=/root/.cache/huggingface \
+    ghcr.io/nvidia-ai-iot/vllm:latest-jetson-orin \
+    vllm serve embedl/Cosmos-Reason2-2B-W4A16 \
+        --host 0.0.0.0 --port 8000 \
+        --trust-remote-code --enforce-eager \
+        --max-model-len 256 --max-num-batched-tokens 256 \
+        --gpu-memory-utilization 0.6 --max-num-seqs 1 \
+        --enable-chunked-prefill \
+        --limit-mm-per-prompt '{"image":1,"video":1}' \
+        --mm-processor-kwargs '{"num_frames":2,"max_pixels":150528}'</code></pre>
+
+        <p>
+            I had to drop NVIDIA's recommended <code>0.65</code> utilization to <code>0.6</code>. At <code>0.65</code>, vLLM's startup sanity check refused to begin: free memory on my board (5.2 GB) exactly equaled the requested budget (0.65 × 7.43 = 4.83 GB minimum free), and vLLM requires strict inequality. <code>0.6</code> passes.
+        </p>
+
+        <h3>vLLM: numbers</h3>
+
+        <p>
+            Five runs, 30-token prompt, 128 output tokens, temperature = model default (0.7):
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th>Wall time (s)</th>
+                    <th>Output tokens</th>
+                    <th>Wall TPS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="num">1</td><td class="num">7.95</td><td class="num">128</td><td class="num">16.10</td></tr>
+                <tr><td class="num">2</td><td class="num">7.85</td><td class="num">128</td><td class="num">16.31</td></tr>
+                <tr><td class="num">3</td><td class="num">7.89</td><td class="num">128</td><td class="num">16.22</td></tr>
+                <tr><td class="num">4</td><td class="num">7.87</td><td class="num">128</td><td class="num">16.26</td></tr>
+                <tr><td class="num">5</td><td class="num">7.84</td><td class="num">128</td><td class="num">16.32</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            Median 16.26 TPS with &lt;1% run-to-run variance. This is wall-clock throughput including prefill; pure-decode TPS is a few percent higher. The number matches Embedl's claimed 16-17 TPS on Orin Nano Super and an independent measurement by <a href="https://www.adwaitx.com/nvidia-cosmos-on-jetson-physical-ai-edge/">AdwaitX</a> at the same point. Independent reproduction of a community result, same hardware class.
+        </p>
+
+        <h3>Memory pressure while serving</h3>
+
+        <p>The board sits close to full while vLLM serves:</p>
+
+        <pre><code class="language-text">$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           7.4Gi       6.5Gi       156Mi       3.0Mi       809Mi       750Mi
+Swap:           11Gi       414Mi        11Gi</code></pre>
+
+        <p>
+            6.5 GB resident with 750 MB genuine headroom and a 414 MB touch of swap. vLLM accounts for ~5 GB (weights + KV cache + activations + CUDA context). The remaining 1.5 GB is the OS, docker, and the usual Linux overhead. This is the edge of what Orin Nano 8 GB + vLLM + a 2B-class VLM allows. Any more generous serve config — longer context, CUDA graphs enabled, higher memory utilization — and vLLM refuses to start.
+        </p>
+
+        <h3>Head-to-head on throughput</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Quantization</th>
+                    <th>Context</th>
+                    <th>Wall TPS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">38</td></tr>
+                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">256</td><td class="num">16</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            <strong>llama.cpp is ~2.4× faster at decode on this hardware.</strong> Two things drive that gap. One: llama.cpp's hand-tuned ggml-cuda kernels are optimized for Ampere SM 8.7 with memory layouts designed for exactly this kind of bandwidth-bound workload; vLLM's PyTorch-backed kernels are general-purpose and assume server-class GPU memory bandwidth. Two: Q4_K_M's block structure is smaller and more cache-friendly than W4A16's per-group scaling, which matters when the memory controller is the bottleneck.
+        </p>
+
+        <p>
+            The 16× context-length asymmetry (4096 vs 256) is real, and it's not a llama.cpp advantage — it's a vLLM configuration constraint. vLLM's allocator reserves peak working memory upfront based on context, so the math gets tight fast on 8 GB. At 2048 context, vLLM's KV cache allocation came out to -1.11 GB, i.e. impossible. At 256 it works.
+        </p>
+
+        <h2>10. Future work: TRT Edge-LLM when the bug is fixed</h2>
+
+        <p>
+            The TRT-Edge-LLM Myelin issue on Cosmos-Reason2-2B is a known, reproducible failure on JetPack 6.2.2 / L4T 36.5 / TRT 10.3. The most likely resolution paths are:
+        </p>
+
+        <ol>
+            <li><strong>NVIDIA patches the NvMap path that Myelin uses.</strong> They've shown they're willing to patch this area (the L4T 36.5 release did exactly that for one path). The forum thread is long and active; this is a tracked issue.</li>
+            <li><strong>TensorRT 10.4+ lands on Jetson.</strong> Newer TRT versions have different autotuner behavior, and Myelin has been reworked. JetPack 6.3 is likely to ship an updated TRT.</li>
+            <li><strong>The Edge-LLM team ships a workaround.</strong> Could be in the export pipeline (force a decomposition that avoids the Myelin fusion), or in the builder (explicit tactic filtering).</li>
+        </ol>
+
+        <p>
+            The quantized ONNX for Cosmos-2B sits on my drive. When any of those paths lands, the retry is 20 minutes. I'll post an update.
+        </p>
+
+        <h2>11. What I actually learned</h2>
+
+        <h3>Production runtimes are platform-fragile at the edge</h3>
+        <p>
+            On a desktop with an RTX 4090, you pick a runtime, install it, and it works. On a Jetson running a recently-patched L4T, the same runtime may or may not start — depending on whether its allocator happens to step on a specific accounting bug in a security patch. The "works on my machine" surface area between desktop and edge is large, and you don't discover it until you try to ship.
+        </p>
+
+        <h3>Same bug, different codepaths, different symptoms</h3>
+        <p>
+            The L4T 36.4.7 NvMap issue surfaced in three distinct ways on three runtimes: a PyTorch NVML assertion at startup (fixed in 36.5), a ViT multimodal-profiling failure after model load (still present for BF16 models in 36.5), and a TRT Myelin autotuner failure during engine build (still present in 36.5). llama.cpp's small-chunk allocation pattern happens to sidestep all three. Knowing how your runtime allocates memory is suddenly a first-class deployment concern, not a trivia question.
+        </p>
+
+        <h3>Community ports carry real weight on constrained platforms</h3>
+        <p>
+            NVIDIA's official Cosmos-2B vLLM recipe for Orin Nano uses their own FP8 checkpoint from NGC. I ended up using Embedl's W4A16 from HuggingFace instead — equivalent story (pre-quantized, fits in 8 GB), but more aggressively compressed and a simpler download. On memory-constrained hardware, the right model isn't always the original checkpoint; it's a community-optimized variant that was built knowing the deployment target.
+        </p>
+
+        <h3>Diagnose before you patch</h3>
+        <p>
+            I spent an hour writing <code>cudaMalloc</code> probes before applying any fixes. The probes told me the bug was not a simple size cap — raw allocations up to 1 GB succeeded standalone — which saved me from several hours of patching the wrong thing. Cheap probes before long builds is a good rule.
+        </p>
+
+        <h3>Portability vs. optimality, made concrete</h3>
+        <p>
+            llama.cpp ships pre-compiled generic CUDA kernels that run on any SM and allocates memory in small chunks. TRT Edge-LLM benchmarks kernel variants on your specific silicon at build time and asks the driver for large contiguous scratch buffers. llama.cpp's approach is why it kept running today — it never triggered the bug. TRT's approach is what you want in production when the build succeeds — a fully-fused engine that's measurably faster. Different answers to the same tradeoff.
+        </p>
+
+        <h2>12. Reproducing this</h2>
 
         <pre><code class="language-bash">git clone https://github.com/hokwangchoi/jetson-orin-nano-benchmarks.git
-cd jetson-orin-nano-benchmarks/vlm-benchmarks/scripts
-pip3 install -r requirements.txt
-python3 benchmark_vlm.py</code></pre>
+cd jetson-orin-nano-benchmarks/vlm-benchmarks
 
+# Upgrade JetPack 6.2.1 → 6.2.2 if you're on an L4T 36.4.x build
+cat device/README.md  # L4T upgrade section
+
+# llama.cpp path (works out of the box on 6.2.2)
+./device/scripts/10_prepare_llamacpp.sh      # download + quantize (~15 min)
+./device/scripts/11_run_llamacpp_server.sh   # serves on :8000
+
+# vLLM path (works on 6.2.2 with W4A16 model + Orin Super Nano config)
+./device/scripts/20_run_vllm_cosmos.sh       # serves on :8000
+
+# Streaming benchmark against vLLM (or llama.cpp — same OpenAI API)
+python3 benchmarks/bench_vllm.py --model embedl/Cosmos-Reason2-2B-W4A16
+
+# TRT Edge-LLM on Cosmos-2B is currently blocked — see:
+cat notes/trt_edgellm_cosmos_blocker.md      # what goes wrong, and why</code></pre>
+
+        <p>
+            Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, and methodology notes are all in <code>vlm-benchmarks/assets/results/</code>.
+        </p>
+
+        <footer>
+            <a href="https://hokwangchoi.com/#blog">← Back to all posts</a>
+            <br>© 2026 Hokwang Choi
+        </footer>
     </article>
-
-    <footer>
-        <a href="https://hokwangchoi.com/#blog">← Back to all posts</a>
-        <br>© 2026 Hokwang Choi
-    </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>

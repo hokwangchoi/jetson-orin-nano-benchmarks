@@ -1,39 +1,43 @@
 # VLM Benchmarks on Jetson Orin Nano
 
-Running a 2B-parameter vision-language model on 8 GB of unified memory —
-and measuring what really matters when you take it off the data-center
+Running a 2B-parameter vision-language model on 8 GB of unified memory
+— and measuring what really matters when you take it off the data-center
 rack and put it on an edge device.
+
+The short version: **three inference runtimes, one platform bug,
+two of them working — one with a community-quantized checkpoint and a
+memory-constrained serve config**. See the [blog post](./index.html)
+for the full story.
 
 ## Why VLMs on the edge?
 
 Perception on a robot or autonomous vehicle used to mean a stack of
 narrow models: YOLO for boxes, DeepLab for segmentation, SORT for tracks,
-maybe BEV-former or a Transformer trajectory predictor. Each was trained
-to answer one kind of question about the world. None of them could tell
-you *why* the scene looks the way it does, or what's about to happen.
+maybe a Transformer trajectory predictor. Each answered one kind of
+question. None could tell you *why* the scene looks the way it does.
 
 Vision-Language Models collapse that stack. A single VLM can caption a
 frame, answer a grounded question about it, reason about object
-relationships over time, and return structured outputs (bounding boxes,
-keypoints, trajectories, JSON). The promise for physical AI is obvious:
+relationships over time, and return structured outputs. The promise for
+physical AI is obvious:
 
 - **Autonomous driving perception**: "Is it safe to turn right?" with
-  evidence drawn from the scene, not just a detection feed. Failure-case
-  understanding for offline data curation and active learning.
-- **Robotics planning**: VLA (vision-language-action) models like π0,
-  OpenVLA, and GR00T-style policies use a VLM as the "brain" that
-  decomposes a natural-language goal into motor primitives.
+  evidence from the scene. Failure-case understanding for offline data
+  curation and active learning.
+- **Robotics planning**: VLA (vision-language-action) models use a VLM
+  as the "brain" that decomposes a natural-language goal into motor
+  primitives.
 - **Safety monitoring**: catching out-of-distribution scenes a narrow
   classifier would miss — construction zones, debris, novel agents.
 - **Teleoperation fallback**: when the autonomy stack disengages, a VLM
   can describe the state of the world to a remote operator in one round
   trip.
 
-The catch is that almost every VLM demo you see runs on a pair of H100s.
-The actual edge platforms that ship on robots and cars — Jetson Orin
-Nano, Orin NX, DRIVE Orin — have 8 to 16 GB of memory shared between CPU
-and GPU, 20 to 100 TOPS of compute, and power budgets under 30 W. What
-does it take to close that gap?
+Almost every VLM demo runs on a pair of H100s. The actual edge platforms
+that ship on robots and cars — Jetson Orin Nano, Orin NX, DRIVE Orin —
+have 8 to 16 GB of memory shared between CPU and GPU, 20 to 100 TOPS of
+compute, and power budgets under 30 W. What does it take to close that
+gap?
 
 ## The model
 
@@ -45,160 +49,173 @@ Transformer decoder. It understands spatial relationships, temporal
 ordering, and basic physics, and outputs chain-of-thought reasoning in
 `<think>...</think><answer>...</answer>` format.
 
-We run it at INT4 weights — the only configuration that fits comfortably
-on Orin Nano 8 GB with headroom for KV cache, activations, and the OS.
-The two runtimes take different routes to INT4:
+llama.cpp runs the raw HuggingFace checkpoint via Q4_K_M on-device
+quantization. vLLM needs a pre-quantized checkpoint because the raw
+BF16 model doesn't fit on 8 GB; we use
+[`embedl/Cosmos-Reason2-2B-W4A16`](https://huggingface.co/embedl/Cosmos-Reason2-2B-W4A16),
+a community port that's about 1.1 GB on disk.
 
-- **llama.cpp**: Q4_K_M (K-quants), applied on-device via `llama-quantize`
-  from the BF16 GGUF checkpoint. Group-wise quantization with a mix of 4-
-  and 5-bit blocks. ~1.1 GB model file.
-- **TRT Edge-LLM**: W4A16 AWQ (Activation-aware Weight Quantization) with
-  FP16 activations, produced on an x86 host with `ModelOpt` using a
-  calibration dataset. ~1.1 GB exported weights.
+## The three runtimes
 
-Both target INT4 on average; the calibration methods, group sizes, and
-GEMM kernels are different. We note the asymmetry in the writeup and
-check output quality on a held-out prompt set to confirm neither
-quantization wrecked the model. Vision encoder stays at FP16/BF16 in
-both cases; lower bits on activations cost accuracy without speeding up
-Ampere tensor cores.
+| Aspect                | llama.cpp                        | vLLM                             | TensorRT Edge-LLM                |
+|-----------------------|----------------------------------|----------------------------------|----------------------------------|
+| Language              | C (ggml core), C++ wrapper       | Python + PyTorch + CUDA kernels  | C++ runtime, zero Python in path |
+| Kernels               | Hand-tuned ggml-cuda             | FlashAttention + general CUDA    | TensorRT fused + hand-tuned      |
+| Graph execution       | Interpretive (op-by-op)          | Eager (graphs disabled on Orin)  | CUDA graph captured at build     |
+| Batching              | Slot pool (`--parallel N`)       | PagedAttention + chunked prefill | Static batch size at build time  |
+| KV cache              | Contiguous per slot              | Paged, virtualized               | Preallocated contiguous          |
+| Cold start            | ~5–10 s (mmap GGUF)              | ~2–3 min (weight load + warmup)  | ~5–10 s (engine load)            |
+| Model used here       | Cosmos-Reason2-2B Q4_K_M         | Cosmos-Reason2-2B W4A16 (Embedl) | blocked — see notes               |
 
-## The three-part story
+Each end-point answers the same benchmark questions, but the runtimes
+come from very different design philosophies. llama.cpp is the generic,
+hackable local runtime. vLLM is the production serving engine with
+PagedAttention and continuous batching. TRT Edge-LLM is the embedded,
+single-app C++ runtime for automotive and robotics.
 
-### 1. Feasibility: can it fit?
+## The L4T 36.4.7 blocker
 
-Before measuring anything, account for every byte. On an 8 GB unified
-memory system with no PCIe-and-discrete-GPU split, every allocation
-contests with the OS, the desktop, and the runtime itself. Details in
-[`FEASIBILITY.md`](./FEASIBILITY.md) (filled in as measurements come in):
+Halfway into the work, I hit an NvMap memory-allocation bug in
+JetPack 6.2.1 (L4T 36.4.7) that blocks CUDA workloads asking for large
+contiguous allocations — see the blog post for the full forensics.
 
-- Weight footprint per component (LLM INT4, ViT FP16, projector FP16).
-- KV cache math: `2 × n_layers × n_kv_heads × head_dim × 2B × seq_len`,
-  and why PagedAttention exists.
-- The VLM inference pipeline:
-  1. Vision encoding (ViT forward pass over image patches → visual tokens)
-  2. Projector (MLP into LLM embedding space)
-  3. Prefill (LLM processes `[visual tokens, text tokens]`, compute-bound)
-  4. Decode (autoregressive generation, memory-bandwidth-bound)
-- Why W4A16 and not W4A4: activations at FP16 because Orin's Ampere
-  tensor cores don't accelerate INT8 activations the way Hopper/Blackwell
-  do — lower bits on activations cost accuracy with no speedup.
+**The same bug surfaces differently on each runtime:**
 
-### 2. Comparison: two runtimes, same model
+- **llama.cpp** — unaffected. Its small-chunk allocation pattern
+  sidesteps the problem entirely.
+- **vLLM** — PyTorch's CUDA caching allocator asserts on an NVML
+  sanity check. Process dies on startup in 6.2.1; in 6.2.2 a variant
+  still triggers if you load the raw BF16 model (hits the bug during
+  multimodal profiling).
+- **TRT Edge-LLM** — the Myelin autotuner's 1 GB scratch-buffer request
+  during engine build gets rejected, with the exact error signature
+  `NvMapMemAllocInternalTagged: 1075072515 error 12`. Specific to the
+  Qwen3-VL-shaped RoPE fused subgraph. Not fixed by 6.2.2.
 
-The same 2B Cosmos-Reason weights run through two C++-native inference
-stacks with very different designs:
+JetPack 6.2.2 / L4T 36.5.0 resolves the startup-level path. vLLM now
+serves Cosmos-2B if you use a pre-quantized W4A16 checkpoint and the
+memory-constrained config NVIDIA published for Orin Super Nano.
 
-| Aspect                | llama.cpp                        | TensorRT Edge-LLM                |
-|-----------------------|----------------------------------|----------------------------------|
-| Language              | C (ggml core), C++ wrapper       | C++ runtime, zero Python in path |
-| Kernels               | Hand-tuned ggml-cuda kernels     | TensorRT fused, hand-tuned       |
-| Graph execution       | Interpretive (op-by-op)          | Captured as CUDA graph at build  |
-| Batching              | Slot pool (`--parallel N`)       | Static batch size at build time  |
-| KV cache              | Contiguous per slot              | Preallocated contiguous          |
-| Weight format         | GGUF (mmap-friendly, single file)| TRT engine (`.engine`)            |
-| Quantization toolchain | `llama-quantize` (K-quants)     | `ModelOpt` → ONNX w/ quant-metadata |
-| Cold start            | ~5–10 s (mmap load)              | ~5–10 s (engine load)            |
-| Intended use          | Edge-native, hackable local runtime | Embedded, single-app          |
+## Current runtime status
 
-Both end up at INT4 average weight precision, but they are *not*
-bit-equivalent: K-quants and AWQ are different quantization algorithms
-that were chosen by their respective ecosystems for good reasons.
-llama.cpp's K-quants pack mixed precision into small blocks and don't
-require activation calibration; AWQ scales weights based on activation
-outlier magnitudes from a calibration set. See
-[`host/README.md`](./host/README.md) for the AWQ pipeline (TRT-Edge-LLM
-only; llama.cpp's quantization runs on-device and is driven by
-[`device/scripts/10_prepare_llamacpp.sh`](./device/scripts/10_prepare_llamacpp.sh)).
+| Runtime | Model | Status |
+|---------|-------|--------|
+| llama.cpp | Cosmos-Reason2-2B Q4_K_M | ✅ serving, benchmarked (TPS = 38) |
+| vLLM | Cosmos-Reason2-2B W4A16 (Embedl) | ✅ serving, benchmarked (TPS = 16) |
+| TRT Edge-LLM | Cosmos-Reason2-2B W4A16 | ❌ blocked on Myelin subgraph, see [`notes/trt_edgellm_cosmos_blocker.md`](./notes/trt_edgellm_cosmos_blocker.md) |
 
-### 3. Profiling: what is each one actually doing?
+Asymmetry: llama.cpp runs at context 4096, vLLM at context 256 (the
+fit-in-memory ceiling). TRT Edge-LLM is pending an upstream fix for
+the NvMap/Myelin issue — numbers will be added when that lands.
 
-This is the section that separates "I ran a benchmark" from "I
-understand my system." Metrics:
+## What each runtime measures
 
 - **Latency**: TTFT (time to first token — includes ViT + prefill),
-  TPOT (time per output token — decode-dominated), TPS (tokens/sec).
+  TPOT (time per output token), TPS (tokens/sec).
 - **Throughput under concurrency**: 1, 2, 4 concurrent requests via
-  llama.cpp's slot pool. TRT Edge-LLM is single-stream, so concurrent
-  numbers only apply to llama.cpp.
+  llama.cpp's slot pool. TRT Edge-LLM is single-stream. vLLM supports
+  continuous batching but KV cache headroom on 8 GB limits
+  `max-num-seqs` to 1 here.
 - **Memory**: peak resident, steady-state, KV cache growth with context
   length. Read from `tegrastats` plus per-process `/proc/PID/status`.
-- **CPU utilization**: per-core from `tegrastats`. Both runtimes are
-  C++-native, so CPU usage should be low and similar — if it isn't, that
-  tells us something interesting about where the orchestration overhead
-  actually lives.
-- **GPU utilization**: `GR3D_FREQ` from `tegrastats`. Low numbers during
-  decode are expected — decode is memory-bandwidth-bound on Orin.
 - **Power**: `VDD_IN`, `VDD_CPU_GPU_CV`, `VDD_SOC` rails from
   `tegrastats`. Energy per token is the edge-relevant metric.
-- **Kernel traces**: Nsight Systems captures for prefill and decode.
-  Kernel mix tells you how much fusion the TRT compiler actually did
-  over the hand-written ggml baseline.
 
-## Phase plan
+## Hardware setup
+
+```bash
+# MAXN_SUPER and max clocks (every benchmark run starts with this)
+sudo nvpmodel -m 2
+sudo jetson_clocks
+
+# Text-mode boot (no GUI) — frees ~100-200 MB GPU memory
+sudo systemctl set-default multi-user.target
+sudo reboot
+
+# Swap: on for production runs, off for memory-measurement sessions
+# (zram is default 3.7 GB; add 8 GB swapfile for kernel build or heavy tactics)
+```
+
+## Phase plan (current)
 
 | Phase | Where     | What                                                           | Status |
 |-------|-----------|----------------------------------------------------------------|--------|
-| 0     | x86 host  | Quantize with `ModelOpt` (TRT-Edge-LLM only, AWQ W4A16) and export ONNX. llama.cpp's Q4_K_M is produced on-device in phase 1b. | ☐ |
-| 1a    | Orin Nano | Build TRT-Edge-LLM C++ runtime + engines.                      | ☐ |
-| 1b    | Orin Nano | Download Cosmos-Reason2-2B GGUF, merge splits, quantize to Q4_K_M. | ☐ |
-| 1c    | Orin Nano | Launch llama-server (OpenAI-compatible, port 8000).            | ☐ |
-| 2     | Orin Nano | Run the harness against both — text, image, video workloads; latency, memory, CPU/GPU, power. | ☐ |
-| 3     | Orin Nano | Capture Nsight profiles for the same prompt on each runtime.   | ☐ |
-| 4     | Anywhere  | Plots, roofline analysis, writeup.                             | ☐ |
+| 0     | Host      | AWQ quantize + ONNX export for TRT-Edge-LLM (on A40 pod, ~30 min). See `host/README.md`. | ✅ |
+| 1a    | Orin Nano | Verify JetPack ≥ 6.2.2 (L4T ≥ 36.5.0). Upgrade via apt if on 6.2.1. See `device/README.md`. | ✅ |
+| 1b    | Orin Nano | Build TRT-Edge-LLM C++ runtime + plugin library. | ✅ |
+| 1c    | Orin Nano | Download Cosmos-Reason2-2B GGUF, merge splits, quantize to Q4_K_M. | ✅ |
+| 2a    | Orin Nano | llama.cpp — launch server, run text + image benchmarks, concurrency sweep. | ✅ |
+| 2b    | Orin Nano | vLLM — launch server with Embedl W4A16, run benchmark suite. | ✅ |
+| 2c    | Orin Nano | TRT Edge-LLM — blocked on NvMap/Myelin bug, investigation documented. | ❌ (upstream fix pending) |
+| 3     | Orin Nano | Capture Nsight profiles for the same prompt on each runtime. | ⏳ |
+| 4     | Anywhere  | Plots, roofline analysis, writeup. | ⏳ |
+| 5     | Future    | Retry TRT Edge-LLM on Cosmos-Reason2-2B once NVIDIA patches the Myelin NvMap path. | ⏳ |
 
 ## Reproducing
 
-Start here:
+Start with `device/README.md` for the JetPack upgrade and hardware
+setup, then work through the phase scripts in order. Each script is
+idempotent and checks for existing outputs before re-running.
 
 ```bash
 cd vlm-benchmarks
-cat host/README.md      # Phase 0: x86 host quantization + ONNX export
-cat device/README.md    # Phase 1: Jetson runtime build + serving
-cat benchmarks/README.md # Phase 2-3: harness and profiling
+cat device/README.md                     # JetPack upgrade, MAXN_SUPER, swap
+cat device/scripts/10_prepare_llamacpp.sh
+cat device/scripts/11_run_llamacpp_server.sh
+cat device/scripts/20_run_vllm_cosmos.sh
+cat notes/trt_edgellm_cosmos_blocker.md  # TRT Edge-LLM blocker writeup
+
+# Streaming benchmark against any OpenAI-compatible endpoint:
+python3 benchmarks/bench_vllm.py --url http://localhost:8000 \
+    --model embedl/Cosmos-Reason2-2B-W4A16
 ```
 
-Each phase's README lists exact commands, expected timings, and known
-failure modes.
-
-## Repository layout (this folder)
+## Repository layout
 
 ```
 vlm-benchmarks/
 ├── README.md                  # this file
-├── index.html                 # blog post (draft)
-├── host/                      # Phase 0 — x86 GPU
-│   ├── scripts/               # setup, quantize (×2), package
+├── index.html                 # blog post
+├── host/                      # Phase 0 — x86/A40 host
+│   ├── scripts/               # setup, quantize, export, package
 │   └── calibration/           # shared calibration set
-├── device/                    # Phase 1 — Jetson
-│   ├── scripts/               # build TRT runtime/engines, prep + run llama-server
-│   └── configs/               # runtime parameters
+├── device/                    # Phase 1-2 — Jetson
+│   ├── README.md              # JetPack upgrade + hardware setup
+│   ├── scripts/               # 10_* llama.cpp, 20_* vLLM, 30_* TRT
+│   └── configs/               # per-runtime parameters
 ├── benchmarks/                # Phase 2-3 — runtime-agnostic harness
-│   ├── harness.py             # orchestrator
+│   ├── harness.py             # orchestrator (tegrastats + power + latency)
+│   ├── bench_vllm.py          # streaming TTFT/TPOT benchmark
 │   ├── clients/               # one thin client per runtime
 │   ├── metrics/               # latency, resource, power parsers
 │   ├── workloads/             # text / image / video prompt sets
 │   └── profiling/             # Nsight + roofline
 ├── analysis/                  # Phase 4 — post-processing
-│   └── plots/                 # all the matplotlib scripts
+│   └── plots/                 # matplotlib scripts
+├── notes/                     # investigation notes, blockers, retries
+│   └── trt_edgellm_cosmos_blocker.md
 ├── assets/                    # inputs + outputs
-│   ├── images/ videos/        # test inputs (add your own)
-│   └── results/               # raw JSON, aggregated CSV, Nsight traces, plots
-└── scripts/
-    └── benchmark_vlm.py       # v1 placeholder (kept as historical reference)
+│   ├── images/ videos/        # test inputs
+│   └── results/               # raw JSON, memory snapshots, CSV
+└── scripts/                   # v1 placeholder (kept as historical reference)
 ```
 
 ## References
 
 - Jetson AI Lab, "TensorRT Edge-LLM on Jetson" —
   https://www.jetson-ai-lab.com/tutorials/tensorrt-edge-llm/
-- Jetson AI Lab, "Cosmos Reason 2 8B" —
-  https://www.jetson-ai-lab.com/models/cosmos-reason2-8b/
+- NVIDIA, "Deploying Open Source Vision Language Models (VLM) on Jetson" —
+  https://huggingface.co/blog/nvidia/cosmos-on-jetson
 - NVIDIA, Cosmos-Reason2-2B model card —
   https://huggingface.co/nvidia/Cosmos-Reason2-2B
+- Embedl, W4A16 port of Cosmos-Reason2-2B —
+  https://huggingface.co/embedl/Cosmos-Reason2-2B-W4A16
 - `robertzty/Cosmos-Reason2-2B-GGUF` (BF16 GGUF + mmproj for llama.cpp) —
   https://huggingface.co/robertzty/Cosmos-Reason2-2B-GGUF
-- llama.cpp —
-  https://github.com/ggml-org/llama.cpp
-- NVIDIA, TensorRT Edge-LLM —
-  https://github.com/NVIDIA/TensorRT-Edge-LLM
+- llama.cpp — https://github.com/ggml-org/llama.cpp
+- vLLM — https://github.com/vllm-project/vllm
+- NVIDIA, TensorRT Edge-LLM — https://github.com/NVIDIA/TensorRT-Edge-LLM
+- NVIDIA forum, "unable to allocate CUDA0 buffer after updating Ubuntu packages" —
+  https://forums.developer.nvidia.com/t/unable-to-allocate-cuda0-buffer-after-updating-ubuntu-packages/347862
+- JetPack 6.2.2 release notes (L4T 36.5.0) —
+  https://docs.nvidia.com/jetson/archives/r36.5/ReleaseNotes/
