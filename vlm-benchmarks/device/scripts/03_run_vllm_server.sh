@@ -45,6 +45,7 @@ sudo sysctl -w vm.drop_caches=3 >/dev/null
 echo "[vllm] mode=$MODE  model=$MODEL_PATH"
 echo "       max_model_len=$MAX_MODEL_LEN gpu_mem_util=$GPU_MEM_UTIL max_num_seqs=$MAX_NUM_SEQS"
 echo "       mm limits: image=$LIMIT_MM_IMAGE video=$LIMIT_MM_VIDEO"
+echo "       enforce_eager=true (no torch.compile — avoids L4T 36.4.7 inductor crash)"
 echo "       listen on :$PORT"
 
 # Build --limit-mm-per-prompt JSON. Keeping image/video at 0 skips the
@@ -77,5 +78,6 @@ sudo docker run --rm -it \
         --max-num-seqs       "$MAX_NUM_SEQS" \
         --limit-mm-per-prompt "$LIMIT_MM_JSON" \
         --reasoning-parser qwen3 \
+        --enforce-eager \
         "${EXTRA_VLLM_ARGS[@]}" \
         --port "$PORT"
