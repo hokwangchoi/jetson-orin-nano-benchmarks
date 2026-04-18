@@ -27,3 +27,5 @@ node_modules/
 
 # Jupyter
 .ipynb_checkpoints/
+
+*.nsys-rep*
