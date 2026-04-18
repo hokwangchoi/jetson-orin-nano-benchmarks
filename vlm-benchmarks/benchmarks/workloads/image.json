@@ -1,0 +1,58 @@
+{
+    "name": "image",
+    "description": "Single-image VLM workloads exercising Cosmos-Reason2's physical-reasoning prompts (describe, count, reason, structured output). All reference assets/images/bus.jpg relative to the vlm-benchmarks/ directory.",
+    "samples": [
+        {
+            "id": "describe",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": "assets/images/bus.jpg"},
+                        {"type": "text", "text": "Describe this scene in one paragraph. Focus on objects, people, and their spatial relationships."}
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "count",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": "assets/images/bus.jpg"},
+                        {"type": "text", "text": "How many people are visible in this image? Count carefully."}
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "embodied_reasoning",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. Answer the question in the following format: <think>\nyour reasoning\n</think>\n\n<answer>\nyour answer\n</answer>."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": "assets/images/bus.jpg"},
+                        {"type": "text", "text": "If I were approaching this scene on foot from the right side, what obstacles or hazards should I be aware of?"}
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "structured",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": "assets/images/bus.jpg"},
+                        {"type": "text", "text": "List the visible traffic-relevant objects in JSON format: [{\"object\": name, \"position\": \"left|center|right\"}, ...]. Output only the JSON, no prose."}
+                    ]
+                }
+            ]
+        }
+    ]
+}
