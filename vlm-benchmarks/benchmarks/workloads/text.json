@@ -1,0 +1,31 @@
+{
+  "name": "text",
+  "description": "Text-only prompts of varying length. Measures pure LLM decode on Orin Nano without vision overhead.",
+  "samples": [
+    {
+      "id": "short_factual",
+      "messages": [
+        {"role": "user", "content": "What is the capital of France?"}
+      ]
+    },
+    {
+      "id": "short_reasoning",
+      "messages": [
+        {"role": "user", "content": "A self-driving car approaches a 4-way intersection. The traffic light is yellow and a pedestrian is crossing. What should the car do and why?"}
+      ]
+    },
+    {
+      "id": "long_embodied",
+      "messages": [
+        {"role": "system", "content": "You are a reasoning assistant for a delivery robot. Answer in the format <think>...</think><answer>...</answer>."},
+        {"role": "user", "content": "The robot is in a narrow hallway with a closed door ahead. Behind the door it hears voices. It has a package to deliver to Room 203 on the other side. List the possible actions it could take, the risks of each, and your recommendation."}
+      ]
+    },
+    {
+      "id": "long_structured",
+      "messages": [
+        {"role": "user", "content": "Describe the standard autonomous driving perception stack in detail. Cover: sensors used, the role of each (camera, lidar, radar, IMU, GPS), typical processing pipeline (preprocessing, detection, tracking, fusion), common failure modes, and metrics used to evaluate each stage."}
+      ]
+    }
+  ]
+}
