@@ -502,7 +502,7 @@ sudo reboot</code></pre>
         </table>
 
         <p>
-            Medians across 5 streaming runs, temperature 0. Variance is tight — TPOT holds to ±0.1 ms once warm. One thing worth flagging: the first image request in any batch runs ~500 ms–3 s for TTFT because vLLM does not capture CUDA graphs for the vision encoder (<code>cudagraph_mm_encoder: False</code>). The ViT path compiles lazily on first use per unique input shape. From run 2 onward, image TTFT settles to ~77 ms. If your deployment is a stream of similarly-shaped frames, this is a one-time cost; if every frame changes resolution, you'll pay it every time. An alternative is to pre-warm the encoder at serve startup with a dummy image at the same resolution as your production stream.
+            Medians across 5 streaming runs, temperature 0. Variance is tight — TPOT holds to ±0.1 ms once warm. One thing worth flagging: the first image request in any batch runs ~500 ms–3 s for TTFT because vLLM does not capture CUDA graphs for the vision encoder (<code>cudagraph_mm_encoder: False</code>). The ViT path compiles lazily on first use per unique input shape. After one or two warmup image requests, TTFT settles to ~77 ms. If your deployment is a stream of similarly-shaped frames, this is a one-time cost; if every frame changes resolution, you'll pay it every time. An alternative is to pre-warm the encoder at serve startup with a dummy image at the same resolution as your production stream.
         </p>
 
         <h3>Memory pressure while serving</h3>
@@ -515,7 +515,7 @@ Mem:           7.4Gi       6.9Gi        92Mi        10Mi       492Mi       362Mi
 Swap:             0B          0B          0B</code></pre>
 
         <p>
-            6.9 GB resident with 362 MB available, swap off. vLLM accounts for ~5 GB (weights + KV cache sized for 1024 context + CUDA graph pools + activations + CUDA context). The remaining 1.9 GB is the OS, docker, and the usual Linux overhead. This is the edge of what Orin Nano 8 GB + vLLM + a 2B-class VLM allows. Push <code>--gpu-memory-utilization</code> to 0.7 or <code>--max-model-len</code> to 2048 and the server refuses to start.
+            6.9 GB resident with 362 MB available, swap off. vLLM accounts for ~5 GB (weights + KV cache sized for 1024 context + CUDA graph pools + activations + CUDA context). The remaining 1.9 GB is the OS, docker, and the usual Linux overhead. This is the edge of what Orin Nano 8 GB + vLLM + a 2B-class VLM allows. Push either <code>--gpu-memory-utilization</code> or <code>--max-model-len</code> much further and the server starts refusing to allocate — in my testing, <code>max-model-len 2048</code> was already past the line.
         </p>
 
         <h3>Iteration cost: NvMap leaks between failed runs</h3>
@@ -558,7 +558,7 @@ Swap:             0B          0B          0B</code></pre>
         </p>
 
         <p>
-            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, multiplied by the number of layers times the number of KV heads. On a 2B model at 8 GB with 5 GB already spoken for by weights, graphs, and vision encoder activations, 1024 is the largest context that still passes the startup sanity check. llama.cpp allocates KV lazily and supports swapping cold pages back to CPU memory, so 4096 fits without drama. This is a real functional difference, not a benchmark artifact: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
+            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, multiplied by the number of layers times the number of KV heads. On a 2B model at 8 GB with 5 GB already spoken for by weights, graphs, and vision encoder activations, 1024 is the largest context that still passes the startup sanity check. llama.cpp allocates KV cache on demand per active slot rather than reserving the full max-context budget upfront, and uses mmap for weights so the OS can swap cold weight pages to disk. 4096 context fits without drama. This is a real functional difference, not a benchmark artifact: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
         </p>
 
         <h2>10. Future work: TRT Edge-LLM when the bug is fixed</h2>

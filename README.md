@@ -44,9 +44,9 @@ runtimes. Intended as a straight comparison on the same model
 - **What happened**: JetPack 6.2.1 shipped with an NvMap memory-allocation
   bug that blocked vLLM and TRT-Edge-LLM in different ways. NVIDIA
   released a partial fix (JetPack 6.2.2). vLLM now works with a
-  community-quantized W4A16 checkpoint (Embedl) and NVIDIA's
-  memory-constrained serve config. TRT-Edge-LLM on Cosmos-2B is still
-  blocked.
+  community-quantized W4A16 checkpoint (Embedl) plus a vision-encoder
+  profile cap that keeps startup allocations under the Orin Nano's
+  NvMap limit. TRT-Edge-LLM on Cosmos-2B is still blocked.
 - **Metrics**: TTFT, TPOT, TPS, peak/steady-state memory
 - **Angle**: robotics and AV perception workloads — what does it
   actually take to deploy a production inference runtime on a 2026 edge

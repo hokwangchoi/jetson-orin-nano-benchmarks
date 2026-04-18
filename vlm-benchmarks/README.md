@@ -5,9 +5,9 @@ Running a 2B-parameter vision-language model on 8 GB of unified memory
 rack and put it on an edge device.
 
 The short version: **three inference runtimes, one platform bug,
-two of them working — one with a community-quantized checkpoint and a
-memory-constrained serve config**. See the [blog post](./index.html)
-for the full story.
+two of them working — one of them (vLLM) requiring a community-quantized
+W4A16 checkpoint and a vision-encoder profile cap to fit on 8 GB**. See
+the [blog post](./index.html) for the full story.
 
 ## Why VLMs on the edge?
 
@@ -60,8 +60,8 @@ a community port that's about 1.1 GB on disk.
 | Aspect                | llama.cpp                        | vLLM                             | TensorRT Edge-LLM                |
 |-----------------------|----------------------------------|----------------------------------|----------------------------------|
 | Language              | C (ggml core), C++ wrapper       | Python + PyTorch + CUDA kernels  | C++ runtime, zero Python in path |
-| Kernels               | Hand-tuned ggml-cuda             | FlashAttention + general CUDA    | TensorRT fused + hand-tuned      |
-| Graph execution       | Interpretive (op-by-op)          | Eager (graphs disabled on Orin)  | CUDA graph captured at build     |
+| Kernels               | Hand-tuned ggml-cuda             | FlashAttention + Marlin W4A16 GEMM | TensorRT fused + hand-tuned      |
+| Graph execution       | Interpretive (op-by-op)          | CUDA graphs (decode + mixed prefill/decode, batch 1–2) | CUDA graph captured at build     |
 | Batching              | Slot pool (`--parallel N`)       | PagedAttention + chunked prefill | Static batch size at build time  |
 | KV cache              | Contiguous per slot              | Paged, virtualized               | Preallocated contiguous          |
 | Cold start            | ~5–10 s (mmap GGUF)              | ~2–3 min (weight load + warmup)  | ~5–10 s (engine load)            |
