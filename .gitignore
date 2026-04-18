@@ -1,29 +1,28 @@
-# Models and engines
-*.pt
-*.onnx
-*.engine
-*.trt
-*.gguf
-*.safetensors
-
 # Python
 __pycache__/
 *.pyc
-*.pyo
-.venv/
-venv/
+.venv*/
+*.egg-info/
 
-# Logs
-*.log
-*.nsys-rep
+# Results — keep CSVs and plots, drop raw bulk artifacts
+vlm-benchmarks/assets/results/raw/*.json
+vlm-benchmarks/assets/results/nsight_profiles/*.nsys-rep
+vlm-benchmarks/assets/results/nsight_profiles/*.qdrep
 
-# Test images (keep sample ones)
-test_image.jpg
+# Model / engine artifacts (multi-GB, rebuilt per machine)
+*.onnx
+*.engine
+*.safetensors
+*.bin
+*.plan
 
-# OS
-.DS_Store
-Thumbs.db
+# Node modules, if any tooling lands later
+node_modules/
 
-# IDE
+# Editor
 .vscode/
 .idea/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
