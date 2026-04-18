@@ -48,7 +48,7 @@ if [ -s "$MERGED" ]; then
     echo "[prep] merged file already present, skipping"
 else
     echo "[prep] merging split files → $MERGED"
-    sudo docker run --rm -v "$MODEL_DIR":/models "$IMAGE" \
+    sudo docker run --rm --runtime=nvidia -v "$MODEL_DIR":/models "$IMAGE" \
         llama-gguf-split --merge \
             /models/Cosmos-Reason2-2B-BF16-split-00001-of-00002.gguf \
             /models/"$MERGED"
@@ -60,7 +60,7 @@ if [ -s "$Q4" ]; then
     echo "[prep] quantized file already present, skipping"
 else
     echo "[prep] quantizing BF16 → Q4_K_M (takes ~5-10 min on Orin Nano)"
-    sudo docker run --rm -v "$MODEL_DIR":/models "$IMAGE" \
+    sudo docker run --rm --runtime=nvidia -v "$MODEL_DIR":/models "$IMAGE" \
         llama-quantize /models/"$MERGED" /models/"$Q4" Q4_K_M
 fi
 
