@@ -78,23 +78,28 @@ python3 benchmark_yolov8.py
 
 ### YOLOv8n (640×640, batch=1, MAXN_SUPER)
 
-| Runtime  | Precision | GPU latency | Throughput | Tensor-core util |
-|----------|-----------|------------:|-----------:|-----------------:|
-| PyTorch  | FP32      |           — |          — |                — |
-| TensorRT | FP32      |      8.37ms |   120 FPS  |                — |
-| TensorRT | FP16      |      4.43ms |   226 FPS  |                — |
-| TensorRT | INT8      |      3.49ms |   287 FPS  |                — |
+| Runtime  | Precision | GPU latency | Throughput | TOPS util |
+|----------|-----------|------------:|-----------:|----------:|
+| PyTorch  | FP32      |     20.88ms |   47.9 FPS |      4.2% |
+| TensorRT | FP32      |      8.36ms |  119.5 FPS |     10.4% |
+| TensorRT | FP16      |      4.43ms |  225.3 FPS |      9.8% |
+| TensorRT | INT8      |      3.49ms |  286.2 FPS |      6.2% |
+
+*TOPS util is achieved TOPS (GFLOPs / latency) divided by peak TOPS for the precision. GPU latency is CUDA-event (PyTorch) or `trtexec` GPU Compute Time (TensorRT), both exclude H2D/D2H transfers.*
 
 ### VLM Inference (Orin Nano 8GB, MAXN_SUPER, JetPack 6.2.2)
 
 | Runtime          | Model                | Quant    | Context | TTFT (text) | TTFT (img) | TPOT | TPS |
 |------------------|----------------------|----------|--------:|------------:|-----------:|-----:|----:|
 | llama.cpp        | Cosmos-Reason2-2B    | Q4_K_M   |    4096 |       58 ms |     306 ms |27 ms |  38 |
-| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  256 |           — |      — | — |  16 |
-| TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|     256 |   *blocked* |  *blocked* |    — |   — |
+| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  1024 |       61 ms |      77 ms |17 ms |  56 |
+| TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|       — |   *blocked* |  *blocked* |    — |   — |
 
-*vLLM TPS is wall-clock (includes prefill). Streaming TTFT/TPOT captured
-via `benchmarks/bench_vllm.py`.*
+*All values are medians of 5 streaming runs captured by `benchmarks/bench_vllm.py`.
+Text runs: 128 output tokens. Image runs: full-size `bus.jpg`, up to 128
+output tokens. vLLM image TTFT is the steady-state value (runs 2–5); the
+first image request in any batch takes 0.5–3 s because the ViT path is
+not CUDA-graph-captured and compiles lazily per unique input shape.*
 *TRT Edge-LLM + Cosmos-2B: blocked on NvMap/Myelin bug, see
 [`vlm-benchmarks/notes/trt_edgellm_cosmos_blocker.md`](./vlm-benchmarks/notes/trt_edgellm_cosmos_blocker.md).
 Retry planned when NVIDIA patches the upstream issue.*
@@ -116,7 +121,7 @@ Retry planned when NVIDIA patches the upstream issue.*
     ├── host/                    # x86 host — quantization + ONNX export
     ├── device/                  # Jetson — runtime build + serving
     │   ├── README.md            # JetPack upgrade, hardware setup
-    │   ├── scripts/             # 10_* llama.cpp, 20_* vLLM
+    │   ├── scripts/             # 03_* vLLM, 10_* / 11_* llama.cpp
     │   └── configs/             # per-runtime env files
     ├── benchmarks/              # runtime-agnostic harness + streaming bench
     │   ├── harness.py           # full orchestrator (tegrastats, power, latency)

@@ -85,7 +85,7 @@ cd vlm-benchmarks/device/scripts
 ./11_run_llamacpp_server.sh           # launches llama-server on :8000
 
 # vLLM path (requires JetPack 6.2.2+)
-./20_run_vllm_cosmos.sh               # launches vLLM serve on :8000
+./03_run_vllm_server.sh               # launches vLLM serve on :8000
 ```
 
 Only one server can listen on port 8000 at a time — stop the previous

@@ -101,10 +101,10 @@ memory-constrained config NVIDIA published for Orin Super Nano.
 | Runtime | Model | Status |
 |---------|-------|--------|
 | llama.cpp | Cosmos-Reason2-2B Q4_K_M | ✅ serving, benchmarked (TPS = 38) |
-| vLLM | Cosmos-Reason2-2B W4A16 (Embedl) | ✅ serving, benchmarked (TPS = 16) |
+| vLLM | Cosmos-Reason2-2B W4A16 (Embedl) | ✅ serving, benchmarked (TPS = 56) |
 | TRT Edge-LLM | Cosmos-Reason2-2B W4A16 | ❌ blocked on Myelin subgraph, see [`notes/trt_edgellm_cosmos_blocker.md`](./notes/trt_edgellm_cosmos_blocker.md) |
 
-Asymmetry: llama.cpp runs at context 4096, vLLM at context 256 (the
+Asymmetry: llama.cpp runs at context 4096, vLLM at context 1024 (the
 fit-in-memory ceiling). TRT Edge-LLM is pending an upstream fix for
 the NvMap/Myelin issue — numbers will be added when that lands.
 
@@ -162,7 +162,7 @@ cd vlm-benchmarks
 cat device/README.md                     # JetPack upgrade, MAXN_SUPER, swap
 cat device/scripts/10_prepare_llamacpp.sh
 cat device/scripts/11_run_llamacpp_server.sh
-cat device/scripts/20_run_vllm_cosmos.sh
+cat device/scripts/03_run_vllm_server.sh
 cat notes/trt_edgellm_cosmos_blocker.md  # TRT Edge-LLM blocker writeup
 
 # Streaming benchmark against any OpenAI-compatible endpoint:
@@ -181,7 +181,7 @@ vlm-benchmarks/
 │   └── calibration/           # shared calibration set
 ├── device/                    # Phase 1-2 — Jetson
 │   ├── README.md              # JetPack upgrade + hardware setup
-│   ├── scripts/               # 10_* llama.cpp, 20_* vLLM, 30_* TRT
+│   ├── scripts/               # 03_* vLLM, 10_*/11_* llama.cpp, 30_* TRT (when unblocked)
 │   └── configs/               # per-runtime parameters
 ├── benchmarks/                # Phase 2-3 — runtime-agnostic harness
 │   ├── harness.py             # orchestrator (tegrastats + power + latency)

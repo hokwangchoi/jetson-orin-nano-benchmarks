@@ -204,8 +204,8 @@
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
             I set out to benchmark Cosmos-Reason2-2B, NVIDIA's physical-AI VLM, across three inference runtimes on a Jetson Orin Nano 8 GB: <strong>llama.cpp</strong>, <strong>vLLM</strong>, and <strong>TensorRT Edge-LLM</strong>.<br><br>
-            What actually happened: vLLM and TRT-Edge-LLM both got blocked by the same JetPack 6.2.1 memory-allocation bug, in two different ways. NVIDIA shipped a fix (JetPack 6.2.2 / L4T 36.5) mid-work that unblocked one of them. Getting vLLM serving required switching to a community-quantized W4A16 checkpoint and applying NVIDIA's documented memory-constrained configuration. TRT-Edge-LLM on this specific model is still blocked, pending an upstream fix.<br><br>
-            Final numbers: <strong>llama.cpp 38 TPS, vLLM 16 TPS</strong> on Cosmos-Reason2-2B. Both working runtimes hold the model at around 5-6 GB of 8 GB unified memory.<br><br>
+            What actually happened: vLLM and TRT-Edge-LLM both got blocked by the same JetPack 6.2.1 memory-allocation bug, in two different ways. NVIDIA shipped a fix (JetPack 6.2.2 / L4T 36.5) mid-work that unblocked one of them. Getting vLLM serving required switching to a community-quantized W4A16 checkpoint and capping the vision encoder's profile-run image size. TRT-Edge-LLM on this specific model is still blocked, pending an upstream fix.<br><br>
+            Final numbers: <strong>vLLM 56 TPS, llama.cpp 38 TPS</strong> on Cosmos-Reason2-2B at W4A16 / Q4_K_M respectively. vLLM wins decode throughput and image first-token latency; llama.cpp wins context length (4096 vs 1024) and has a cleaner startup story. Both hold the model at around 5–7 GB of 8 GB unified memory.<br><br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
@@ -445,7 +445,7 @@ sudo reboot</code></pre>
             <strong>The fix is partial.</strong> L4T 36.5 resolves the tiny-allocation NVML path, so PyTorch can initialize. But loading a 5 GB BF16 model still triggers a variant of the same bug at the multimodal profiling stage — the ViT positional-embedding path asks for a contiguous 1 GB allocation and gets the same rejection. TRT-Edge-LLM's Myelin autotuner hits the same wall.
         </p>
 
-        <h2>9. After the fix: vLLM, but only with W4A16</h2>
+        <h2>9. After the fix: vLLM with W4A16</h2>
 
         <p>
             Two shifts were required to get vLLM actually serving:
@@ -456,7 +456,7 @@ sudo reboot</code></pre>
                 <strong>Model swap.</strong> The raw <code>nvidia/Cosmos-Reason2-2B</code> at BF16 is ~5 GB of weights plus PyTorch allocator overhead — it loads, but dies at multimodal profiling where the encoder cache allocates on top of loaded weights. I switched to <a href="https://huggingface.co/embedl/Cosmos-Reason2-2B-W4A16"><code>embedl/Cosmos-Reason2-2B-W4A16</code></a>, a community-quantized W4A16 AWQ version that takes 2.29 GB of GPU memory. Embedl is a small edge-AI company in Sweden; their port sidesteps the problem by shrinking the weight footprint enough that the rest of the pipeline has room to breathe.
             </li>
             <li>
-                <strong>Match NVIDIA's Orin Super Nano config.</strong> <a href="https://huggingface.co/blog/nvidia/cosmos-on-jetson">NVIDIA's own deployment blog</a> publishes a specific recipe for the Orin Nano Super — <code>max-model-len 256</code>, <code>enforce-eager</code>, <code>gpu-memory-utilization 0.65</code>, multimodal pixel cap of 150528, <code>max-num-seqs 1</code>. These aren't suggestions; they're the configuration that fits in 8 GB.
+                <strong>Cap the vision encoder profile.</strong> vLLM's startup profile runs the ViT at its declared maximum image size to size the encoder cache. On Qwen3-VL that default is ~1.4 M pixels, which asks the allocator for ~1 GB contiguous and cascades into the same NvMap failure mode from §8. The fix is to pass <code>--mm-processor-kwargs '{"num_frames":2,"max_pixels":150528}'</code> and <code>--limit-mm-per-prompt '{"image":1,"video":1}'</code>. Neither flag appears on Embedl's model card; without them the server won't start on an 8 GB board.
             </li>
         </ol>
 
@@ -469,43 +469,40 @@ sudo reboot</code></pre>
     ghcr.io/nvidia-ai-iot/vllm:latest-jetson-orin \
     vllm serve embedl/Cosmos-Reason2-2B-W4A16 \
         --host 0.0.0.0 --port 8000 \
-        --trust-remote-code --enforce-eager \
-        --max-model-len 256 --max-num-batched-tokens 256 \
-        --gpu-memory-utilization 0.6 --max-num-seqs 1 \
-        --enable-chunked-prefill \
-        --limit-mm-per-prompt '{"image":1,"video":1}' \
-        --mm-processor-kwargs '{"num_frames":2,"max_pixels":150528}'</code></pre>
+        --max-model-len 1024 \
+        --gpu-memory-utilization 0.65 \
+        --max-num-seqs 1 \
+        --mm-processor-kwargs '{"num_frames":2,"max_pixels":150528}' \
+        --limit-mm-per-prompt '{"image":1,"video":1}'</code></pre>
 
         <p>
-            I had to drop NVIDIA's recommended <code>0.65</code> utilization to <code>0.6</code>. At <code>0.65</code>, vLLM's startup sanity check refused to begin: free memory on my board (5.2 GB) exactly equaled the requested budget (0.65 × 7.43 = 4.83 GB minimum free), and vLLM requires strict inequality. <code>0.6</code> passes.
+            A few things to know if you're reproducing this. <strong>Run headless.</strong> <code>--gpu-memory-utilization 0.65</code> on an 8 GB board needs the desktop killed (<code>sudo systemctl isolate multi-user.target</code>) and swap off (<code>sudo swapoff -a</code>); with the desktop up, vLLM refuses to start because there isn't enough free memory to hit the requested utilization. <strong>Context length trades against image headroom.</strong> The Qwen3-VL visual tokenizer emits about 770 tokens per image at the 150528-pixel cap; at <code>max-model-len 1024</code> that leaves ~240 tokens for the prompt and generation, which is enough for short outputs but not long reasoning traces. If you need more decode budget, you can shorten <code>max_pixels</code> further (fewer visual tokens per image) or accept that long generations are text-only. <strong>Don't pass <code>--enforce-eager</code>.</strong> vLLM 0.19's defaults already enable CUDA graphs, chunked prefill, and prefix caching; the startup log confirms <code>Capturing CUDA graphs (decode, FULL): 1/1</code> and <code>Using MarlinLinearKernel for CompressedTensorsWNA16</code>. Some community recipes add <code>--enforce-eager</code> as a memory workaround, which disables the graphs and costs roughly 3× in decode throughput. On an 8 GB board the memory savings aren't worth it — the graphs only take ~10 MB on this model.
         </p>
 
         <h3>vLLM: numbers</h3>
 
         <p>
-            Five runs, 30-token prompt, 128 output tokens, temperature = model default (0.7):
+            Five runs each, streaming measurement, temperature 0. Text prompt is 30 tokens generating 128; image prompt is 20 tokens over <code>bus.jpg</code> generating up to 128 (the model stops at its EOS around 101):
         </p>
 
         <table>
             <thead>
                 <tr>
-                    <th>Run</th>
-                    <th>Wall time (s)</th>
+                    <th>Workload</th>
+                    <th>TTFT (ms)</th>
+                    <th>TPOT (ms)</th>
+                    <th>TPS (decode)</th>
                     <th>Output tokens</th>
-                    <th>Wall TPS</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td class="num">1</td><td class="num">7.95</td><td class="num">128</td><td class="num">16.10</td></tr>
-                <tr><td class="num">2</td><td class="num">7.85</td><td class="num">128</td><td class="num">16.31</td></tr>
-                <tr><td class="num">3</td><td class="num">7.89</td><td class="num">128</td><td class="num">16.22</td></tr>
-                <tr><td class="num">4</td><td class="num">7.87</td><td class="num">128</td><td class="num">16.26</td></tr>
-                <tr><td class="num">5</td><td class="num">7.84</td><td class="num">128</td><td class="num">16.32</td></tr>
+                <tr><td>Text, 30-tok prompt</td><td class="num">60.9</td><td class="num">17.4</td><td class="num">56.5</td><td class="num">128</td></tr>
+                <tr><td>Text+image, <code>bus.jpg</code></td><td class="num">77.1</td><td class="num">18.4</td><td class="num">52.3</td><td class="num">101</td></tr>
             </tbody>
         </table>
 
         <p>
-            Median 16.26 TPS with &lt;1% run-to-run variance. This is wall-clock throughput including prefill; pure-decode TPS is a few percent higher. The number matches Embedl's claimed 16-17 TPS on Orin Nano Super and an independent measurement by <a href="https://www.adwaitx.com/nvidia-cosmos-on-jetson-physical-ai-edge/">AdwaitX</a> at the same point. Independent reproduction of a community result, same hardware class.
+            Medians across 5 streaming runs, temperature 0. Variance is tight — TPOT holds to ±0.1 ms once warm. One thing worth flagging: the first image request in any batch runs ~500 ms–3 s for TTFT because vLLM does not capture CUDA graphs for the vision encoder (<code>cudagraph_mm_encoder: False</code>). The ViT path compiles lazily on first use per unique input shape. From run 2 onward, image TTFT settles to ~77 ms. If your deployment is a stream of similarly-shaped frames, this is a one-time cost; if every frame changes resolution, you'll pay it every time. An alternative is to pre-warm the encoder at serve startup with a dummy image at the same resolution as your production stream.
         </p>
 
         <h3>Memory pressure while serving</h3>
@@ -514,14 +511,24 @@ sudo reboot</code></pre>
 
         <pre><code class="language-text">$ free -h
                total        used        free      shared  buff/cache   available
-Mem:           7.4Gi       6.5Gi       156Mi       3.0Mi       809Mi       750Mi
-Swap:           11Gi       414Mi        11Gi</code></pre>
+Mem:           7.4Gi       6.9Gi        92Mi        10Mi       492Mi       362Mi
+Swap:             0B          0B          0B</code></pre>
 
         <p>
-            6.5 GB resident with 750 MB genuine headroom and a 414 MB touch of swap. vLLM accounts for ~5 GB (weights + KV cache + activations + CUDA context). The remaining 1.5 GB is the OS, docker, and the usual Linux overhead. This is the edge of what Orin Nano 8 GB + vLLM + a 2B-class VLM allows. Any more generous serve config — longer context, CUDA graphs enabled, higher memory utilization — and vLLM refuses to start.
+            6.9 GB resident with 362 MB available, swap off. vLLM accounts for ~5 GB (weights + KV cache sized for 1024 context + CUDA graph pools + activations + CUDA context). The remaining 1.9 GB is the OS, docker, and the usual Linux overhead. This is the edge of what Orin Nano 8 GB + vLLM + a 2B-class VLM allows. Push <code>--gpu-memory-utilization</code> to 0.7 or <code>--max-model-len</code> to 2048 and the server refuses to start.
         </p>
 
-        <h3>Head-to-head on throughput</h3>
+        <h3>Iteration cost: NvMap leaks between failed runs</h3>
+
+        <p>
+            Sitting this close to the memory ceiling means every config tweak is a coin flip, and a lot of them fail. On Tegra, failing is expensive: a crashed vLLM process leaves NvMap mappings that <code>docker rm -f</code> does not fully reclaim. After a startup failure, CUDA reports several hundred megabytes less free memory than <code>free -h</code> shows at the system level. The next attempt can then OOM at a <code>--gpu-memory-utilization</code> value that would otherwise succeed — which makes the leak look like a bad config.
+        </p>
+
+        <p>
+            <code>sudo sysctl -w vm.drop_caches=3 &amp;&amp; sudo docker system prune -f</code> recovers most of it; only a reboot recovers all of it. In practice, iterating on vLLM config on an Orin Nano benefits from a reboot every few failed attempts. Not something you'd notice on a GPU workstation, where the driver cleanly releases memory between runs. This board is closer to an embedded device than a server, and the tooling around it hasn't caught up to that framing.
+        </p>
+
+        <h3>Head-to-head: Cosmos-Reason2-2B across runtimes</h3>
 
         <table>
             <thead>
@@ -529,21 +536,29 @@ Swap:           11Gi       414Mi        11Gi</code></pre>
                     <th>Runtime</th>
                     <th>Quantization</th>
                     <th>Context</th>
-                    <th>Wall TPS</th>
+                    <th>TTFT text</th>
+                    <th>TTFT image</th>
+                    <th>TPOT</th>
+                    <th>TPS</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">38</td></tr>
-                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">256</td><td class="num">16</td></tr>
+                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">58 ms</td><td class="num">306 ms</td><td class="num">27 ms</td><td class="num">38</td></tr>
+                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">77 ms</td><td class="num">17 ms</td><td class="num">56</td></tr>
+                <tr><td>TRT Edge-LLM</td><td>W4A16 AWQ</td><td class="num">—</td><td class="num">blocked</td><td class="num">blocked</td><td class="num">—</td><td class="num">—</td></tr>
             </tbody>
         </table>
 
         <p>
-            <strong>llama.cpp is ~2.4× faster at decode on this hardware.</strong> Two things drive that gap. One: llama.cpp's hand-tuned ggml-cuda kernels are optimized for Ampere SM 8.7 with memory layouts designed for exactly this kind of bandwidth-bound workload; vLLM's PyTorch-backed kernels are general-purpose and assume server-class GPU memory bandwidth. Two: Q4_K_M's block structure is smaller and more cache-friendly than W4A16's per-group scaling, which matters when the memory controller is the bottleneck.
+            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. <strong>vLLM leads on decode (56 vs 38 TPS)</strong>, on TPOT (17 vs 27 ms), and on first-token latency for image workloads (77 vs 306 ms) once the vision encoder has warmed up. llama.cpp matches vLLM on text TTFT and supports a 4× longer context out of the box. TRT Edge-LLM is still blocked on the NvMap/Myelin issue from §8; whenever that lands upstream it should close the gap and probably exceed vLLM, since it compiles to a single fused engine with no Python in the path.
         </p>
 
         <p>
-            The 16× context-length asymmetry (4096 vs 256) is real, and it's not a llama.cpp advantage — it's a vLLM configuration constraint. vLLM's allocator reserves peak working memory upfront based on context, so the math gets tight fast on 8 GB. At 2048 context, vLLM's KV cache allocation came out to -1.11 GB, i.e. impossible. At 256 it works.
+            Why vLLM wins decode on this workload: the W4A16 AWQ weights dispatch through vLLM's Marlin GEMM kernels (<code>Using MarlinLinearKernel for CompressedTensorsWNA16</code>), which are tuned for Ampere tensor cores and do on-the-fly INT4→FP16 dequantization in the GEMM prologue. llama.cpp's Q4_K_M GGUF goes through ggml-cuda kernels that are excellent but more general-purpose; they don't specialize as aggressively for SM 8.7. Both runtimes are memory-bandwidth-bound on a 2B model — the 68 GB/s ceiling on Orin Nano's LPDDR5 caps everyone — but Marlin's kernel shape gets closer to that ceiling.
+        </p>
+
+        <p>
+            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, multiplied by the number of layers times the number of KV heads. On a 2B model at 8 GB with 5 GB already spoken for by weights, graphs, and vision encoder activations, 1024 is the largest context that still passes the startup sanity check. llama.cpp allocates KV lazily and supports swapping cold pages back to CPU memory, so 4096 fits without drama. This is a real functional difference, not a benchmark artifact: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
         </p>
 
         <h2>10. Future work: TRT Edge-LLM when the bug is fixed</h2>
@@ -586,7 +601,10 @@ Swap:           11Gi       414Mi        11Gi</code></pre>
 
         <h3>Portability vs. optimality, made concrete</h3>
         <p>
-            llama.cpp ships pre-compiled generic CUDA kernels that run on any SM and allocates memory in small chunks. TRT Edge-LLM benchmarks kernel variants on your specific silicon at build time and asks the driver for large contiguous scratch buffers. llama.cpp's approach is why it kept running today — it never triggered the bug. TRT's approach is what you want in production when the build succeeds — a fully-fused engine that's measurably faster. Different answers to the same tradeoff.
+            llama.cpp ships pre-compiled generic CUDA kernels that run on any SM and allocates memory in small chunks. TRT Edge-LLM benchmarks kernel variants on your specific silicon at build time and asks the driver for large contiguous scratch buffers. llama.cpp's approach is why it kept running when the NvMap bug surfaced — it never triggered it. TRT's approach is what you want in production when the build succeeds — a fully-fused engine with predictable latency.
+        </p>
+        <p>
+            vLLM sits in between: a general-purpose Python + PyTorch serving layer with specialized kernels (Marlin for W4A16, FlashAttention for prefill, CUDA graphs for decode) wired in for the hot paths. That mix is why it beats llama.cpp's more uniform ggml-cuda kernels on decode throughput for this specific quantization, while still running without a per-device build step. The price is a bigger steady-state memory footprint and a more fragile startup path — the same reasons the NvMap bug hit it harder than it hit llama.cpp. Three different answers to the same portability-vs-optimality tradeoff, and on this hardware the middle answer happens to win on throughput.
         </p>
 
         <h2>12. Reproducing this</h2>
@@ -602,7 +620,7 @@ cat device/README.md  # L4T upgrade section
 ./device/scripts/11_run_llamacpp_server.sh   # serves on :8000
 
 # vLLM path (works on 6.2.2 with W4A16 model + Orin Super Nano config)
-./device/scripts/20_run_vllm_cosmos.sh       # serves on :8000
+./device/scripts/03_run_vllm_server.sh       # serves on :8000
 
 # Streaming benchmark against vLLM (or llama.cpp — same OpenAI API)
 python3 benchmarks/bench_vllm.py --model embedl/Cosmos-Reason2-2B-W4A16
