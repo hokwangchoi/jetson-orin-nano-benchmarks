@@ -35,11 +35,12 @@ YOLOv8 object detection across the full optimization pipeline:
 ### [Vision Language Models](./vlm-benchmarks/) — 🚧 in progress
 
 Running a 2B-parameter VLM on 8GB unified memory, comparing two inference
-runtimes on the exact same quantized model:
+runtimes on the same model at INT4 weights:
 - **Model**: Cosmos-Reason2-2B (Qwen3-VL-2B post-trained for physical reasoning)
-- **Quantization**: W4A16 AWQ (INT4 weights, FP16 activations)
-- **Runtimes**: vLLM (Python, PagedAttention, continuous batching) vs
-  TensorRT Edge-LLM (C++, fused TensorRT kernels, CUDA graphs)
+- **Quantization**: INT4 weights (Q4_K_M GGUF for llama.cpp; W4A16 AWQ for
+  TRT Edge-LLM) — different schemes, both standard for their runtime
+- **Runtimes**: llama.cpp (ggml C runtime, hand-tuned CUDA kernels) vs
+  TensorRT Edge-LLM (C++ runtime, fused TRT kernels, CUDA graphs)
 - **Metrics**: TTFT, TPOT, TPS, CPU + GPU utilization, VDD power rails,
   peak/steady-state memory, Nsight kernel traces
 - **Angle**: robotics and AV perception workloads — what does it take to put
@@ -82,7 +83,7 @@ python3 benchmark_yolov8.py
 
 | Runtime          | Model                  | TTFT | TPOT | TPS | Mem | CPU | GPU |
 |------------------|------------------------|-----:|-----:|----:|----:|----:|----:|
-| vLLM             | Cosmos-Reason2-2B-W4A16 |    — |    — |   — |   — |   — |   — |
+| llama.cpp        | Cosmos-Reason2-2B-Q4_K_M |    — |    — |   — |   — |   — |   — |
 | TRT Edge-LLM     | Cosmos-Reason2-2B-W4A16 |    — |    — |   — |   — |   — |   — |
 
 *Results filled in as benchmarks complete.*
