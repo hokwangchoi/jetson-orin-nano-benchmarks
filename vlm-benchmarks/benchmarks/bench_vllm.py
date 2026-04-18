@@ -39,7 +39,7 @@ TEXT_PROMPT = (
     "Describe a pedestrian crossing scene in an autonomous driving context. "
     "Include vehicles, pedestrians, signals, and potential hazards."
 )
-IMAGE_PROMPT = "What do you see in this image? Describe the scene in detail."
+IMAGE_PROMPT = "Describe this image in 3 sentences. Focus only on what you can actually see."
 
 
 def post_stream(url: str, payload: dict, timeout: float = 120.0):

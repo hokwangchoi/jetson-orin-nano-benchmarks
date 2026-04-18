@@ -1,0 +1,116 @@
+{
+  "runtime_label": "vllm_cosmos_w4a16",
+  "model": "embedl/Cosmos-Reason2-2B-W4A16",
+  "url": "http://localhost:8000",
+  "n_runs": 5,
+  "n_warmup": 3,
+  "temperature": 0.0,
+  "text_prompt": "Describe a pedestrian crossing scene in an autonomous driving context. Include vehicles, pedestrians, signals, and potential hazards.",
+  "image_prompt": "Describe this image in 3 sentences. Focus only on what you can actually see.",
+  "image_path": "assets/images/bus.jpg",
+  "max_tokens_text": 128,
+  "max_tokens_image": 32,
+  "text_results": [
+    {
+      "ttft_ms": 138.6506039998494,
+      "tpot_ms": 63.13223274015385,
+      "tps": 15.692785588859367,
+      "output_tokens": 128,
+      "wall_s": 8.156614341998647,
+      "run": 1
+    },
+    {
+      "ttft_ms": 139.02856999993674,
+      "tpot_ms": 63.19317555905908,
+      "tps": 15.676943193608011,
+      "output_tokens": 128,
+      "wall_s": 8.164857039999333,
+      "run": 2
+    },
+    {
+      "ttft_ms": 140.974443000232,
+      "tpot_ms": 62.706798110232874,
+      "tps": 15.792660526867975,
+      "output_tokens": 128,
+      "wall_s": 8.105030800999884,
+      "run": 3
+    },
+    {
+      "ttft_ms": 140.41370099948836,
+      "tpot_ms": 62.27046735433201,
+      "tps": 15.90259156171029,
+      "output_tokens": 128,
+      "wall_s": 8.049002547999407,
+      "run": 4
+    },
+    {
+      "ttft_ms": 142.3715719993197,
+      "tpot_ms": 62.15667062205048,
+      "tps": 15.927178304843927,
+      "output_tokens": 128,
+      "wall_s": 8.036577323999154,
+      "run": 5
+    }
+  ],
+  "text_summary": {
+    "ttft_ms": {
+      "median": 140.41370099948836,
+      "mean": 140.28777799976524,
+      "min": 138.6506039998494,
+      "max": 142.3715719993197,
+      "n": 5
+    },
+    "tpot_ms": {
+      "median": 62.706798110232874,
+      "mean": 62.69186887716566,
+      "min": 62.15667062205048,
+      "max": 63.19317555905908,
+      "n": 5
+    },
+    "tps": {
+      "median": 15.792660526867975,
+      "mean": 15.798431835177913,
+      "min": 15.676943193608011,
+      "max": 15.927178304843927,
+      "n": 5
+    },
+    "output_tokens": {
+      "median": 128,
+      "mean": 128,
+      "min": 128,
+      "max": 128,
+      "n": 5
+    },
+    "wall_s": {
+      "median": 8.105030800999884,
+      "mean": 8.102416410999286,
+      "min": 8.036577323999154,
+      "max": 8.164857039999333,
+      "n": 5
+    }
+  },
+  "image_results": [
+    {
+      "error": "no tokens received",
+      "run": 1
+    },
+    {
+      "error": "no tokens received",
+      "run": 2
+    },
+    {
+      "error": "no tokens received",
+      "run": 3
+    },
+    {
+      "error": "no tokens received",
+      "run": 4
+    },
+    {
+      "error": "no tokens received",
+      "run": 5
+    }
+  ],
+  "image_summary": {},
+  "timestamp": "2026-04-18T17:44:54.106461"
+}
