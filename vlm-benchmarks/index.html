@@ -590,7 +590,64 @@ sudo reboot</code></pre>
             Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, and TRT Edge-LLM bakes the max KV capacity into the engine at build time. On a 2B model at 8 GB with 5 GB already spoken for, 1024 is the largest context that fits for either. llama.cpp allocates KV cache on demand per slot and mmaps weights so cold pages can page out — 4096 context fits without drama. Real functional difference: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
         </p>
 
-        <h2>11. What I actually learned</h2>
+        <h2>11. Profiling: what the decode loop actually looks like</h2>
+
+        <p>
+            The numbers in §10 answer "how fast," but not "why" or "how stable." To see whether inference has the rhythm the architecture predicts, I captured two things on TRT Edge-LLM: a kernel-level timeline with Nsight Systems, and a coarser system-level utilization trace with <code>tegrastats</code>. vLLM and llama.cpp both run inside docker containers without <code>--pid=host</code>, which makes host-side <code>nsys</code> capture impractical on the Nsight Systems 2024.5 that ships with this JetPack — so the kernel-level view here is TRT-only. What the other two runtimes' traces would probably show, qualitatively, is at the end of this section.
+        </p>
+
+        <h3>One inference, three phases</h3>
+
+        <figure class="figure">
+            <img src="assets/results/nsight/trt_overview.png" alt="Nsight Systems timeline overview of one llm_inference invocation, showing engine load, vision encoder, prefill, and decode phases">
+            <figcaption>One <code>llm_inference</code> invocation against <code>sanity_image.json</code>: 128-token image request. Full trace, 8 seconds wide.</figcaption>
+        </figure>
+
+        <p>
+            Scanning left to right: the first ~4 seconds are engine deserialization and weight transfers — <code>llm.engine</code> + <code>visual.engine</code> together are ~1.2 GB of INT4 + FP16 blobs, and <code>cudaMemcpyAsync</code> dominates that span. Then the actual inference: a short block around 4.9 s for the vision encoder (~200 ms, gemm kernels over the patched image), a busier block 5.0–5.4 s for LLM prefill (the TensorRT row lights up with <code>ExecutionContext</code> calls as the engine crunches image tokens + short text prompt), and from ~5.45 s onward a single unbroken orange bar on the CUDA HW row — 128 CUDA graph replays back to back, one per generated token.
+        </p>
+
+        <h3>One token = one CUDA graph</h3>
+
+        <figure class="figure">
+            <img src="assets/results/nsight/trt_one_tpot.png" alt="Nsight zoomed to a 17 ms window around one decode step, showing a single CUDA graph execution on stream 13 and a matching cudaStreamSynchronize on the host">
+            <figcaption>Zoomed to one TPOT: a 17 ms window mid-decode.</figcaption>
+        </figure>
+
+        <p>
+            This is the whole story in one frame. <code>Graph 1 (GraphExec 2)</code> runs for ~16 ms on stream 13 — that's the complete forward pass of Cosmos-Reason2-2B for one output token, captured once as a CUDA graph and replayed every decode step. On the host side, a single <code>cudaStreamSynchronize</code> call spans the same 16 ms. That's the CPU doing nothing except waiting for the GPU. No Python loop, no per-kernel launch overhead, no framework bookkeeping in the hot path. The 16.7 ms TPOT we measured is the GPU's memory-bandwidth-bound time to do one forward pass on this hardware, and there is no slack in the pipeline to recover.
+        </p>
+
+        <p>
+            Three streams carry the work — 79.4% on stream 13, 14.9% on stream 14, 5.3% on stream 216. The graph is effectively serialized on the primary stream, with small parallel operations (probably dequantization prefetch or bias loads) on secondaries.
+        </p>
+
+        <h3>System utilization over a full benchmark</h3>
+
+        <figure class="figure">
+            <img src="assets/results/tegrastats/trt_utilization.png" alt="Three-panel plot: GPU utilization, RAM, and power draw over time for one bench_trt.sh run">
+            <figcaption>GPU, RAM, and VDD_IN power, 100 ms sampling, across one <code>bench_trt.sh</code> run — 7 text runs then 7 image runs, each with 2 warmups and 5 measured.</figcaption>
+        </figure>
+
+        <p>
+            Three things jump out. <strong>GPU utilization pins at 99%</strong> during both text and image phases — we're bandwidth-bound on the 68 GB/s LPDDR5, and <code>tegrastats</code>' 100 ms sample doesn't see the 16 ms per-token breathing room. <strong>RAM settles at ~4.2 GB</strong> during inference (matches the 4.3 GB peak we published within noise), drops to ~1.5 GB in the gap at t ≈ 9–14 s — which is <code>bench_trt.sh</code> spawning a second <code>llm_inference</code> process for the image workload after the text one exits, releasing and then reloading the engines — then climbs back up. <strong>Power draws ~21 W during inference vs 7 W idle</strong>: roughly 14 W per forward pass at one pass every 16 ms works out to about 0.23 J per generated token. Not a published figure, just a number that falls out of the trace.
+        </p>
+
+        <h3>What the other two runtimes' traces would probably show</h3>
+
+        <p>
+            Without equivalent captures for vLLM and llama.cpp, there's some extrapolation here, but the benchmark numbers and runtime architectures constrain the story:
+        </p>
+
+        <p>
+            <strong>vLLM</strong> also uses <code>torch.compile</code> to capture decode into a CUDA graph, so the GPU-side picture should look similar — replay per token, full utilization, tight rhythm. The difference would be on the host side: vLLM's hot path still dispatches through Python, so expect visible Python bookkeeping between graph replays in the CUDA API row. That's likely where the ~1 ms TPOT gap vs TRT comes from (17 vs 16 ms) — not kernel quality, Python glue.
+        </p>
+
+        <p>
+            <strong>llama.cpp</strong> is the different shape. It doesn't use CUDA graphs at all — decode is a per-step launch of many small <code>ggml-cuda</code> kernels. In an Nsight trace you'd see the CUDA HW row filled with small colorful rectangles rather than one solid block, and the CUDA API row showing a per-kernel <code>cudaLaunchKernel</code> rhythm. 26 ms TPOT = ~10 ms more than TRT, plausibly dominated by launch overhead and less aggressive kernel fusion rather than the actual math. Capturing this cleanly needs either <code>--pid=host</code> on the <code>llamacpp-serve</code> container, or running <code>nsys</code> inside the container. Worth doing as a follow-up; not required for the story.
+        </p>
+
+        <h2>12. What I actually learned</h2>
 
         <h3>Production runtimes are platform-fragile at the edge</h3>
         <p>
@@ -625,7 +682,7 @@ sudo reboot</code></pre>
             Two of the three walls I hit on this project were allocator walls, not model walls. vLLM's startup failure was a CUDA caching allocator interaction. TRT Edge-LLM's build failure was the kernel's CMA pool exhausting under Myelin's retry behavior. Both looked like model problems at first glance — "the VLM doesn't fit" — but the root causes were downstream of anything you'd find by reading the model architecture. On memory-constrained edge hardware, live-instrumenting the allocator (<code>/proc/meminfo</code>, <code>CmaFree</code>, per-process NvMap tracking) is more often the right move than reading more TRT docs.
         </p>
 
-        <h2>12. Reproducing this</h2>
+        <h2>13. Reproducing this</h2>
 
         <h3>One-time setup</h3>
 
@@ -681,11 +738,25 @@ python3 device/trt_cosmos_patches/split_lm_head.py  # graph rewrite
         <pre><code class="language-bash"># 5-run benchmark — TRT runs as a single-process CLI, no server needed
 ./scripts/bench_trt.sh</code></pre>
 
+        <h3>Profiling (optional)</h3>
+
+        <pre><code class="language-bash"># Kernel-level Nsight timeline for one TRT image inference
+./scripts/nsight_trt.sh
+
+# System-level utilization over a full benchmark (GPU%, RAM, power)
+./scripts/tegrastats_capture.sh trt ./scripts/bench_trt.sh
+
+# Plot tegrastats CSV
+python3 scripts/plot_tegrastats.py \
+    --csv assets/results/tegrastats/trt_*.csv:trt \
+    --out assets/results/tegrastats/trt_utilization.png \
+    --trim-to-active</code></pre>
+
         <p>
             Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, CMA traces, and methodology notes are all in <code>vlm-benchmarks/assets/results/</code>. Investigation writeups for the TRT workaround are in <code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code>.
         </p>
 
-        <h2>13. Closing</h2>
+        <h2>14. Closing</h2>
 
         <p>
             The reason I did this work is that VLMs are showing up as the grounded-reasoning layer in robotics and autonomous-vehicle stacks, and the hardware they'll actually run on is Jetson-class edge silicon. I wanted to see for myself what it takes to get there in 2026 — not from a tutorial, not from a support matrix, just hands-on with a board and a model.
