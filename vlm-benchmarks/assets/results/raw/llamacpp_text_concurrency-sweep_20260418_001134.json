@@ -1,0 +1,306 @@
+{
+  "run_id": "llamacpp_text_concurrency-sweep_20260418_001134",
+  "runtime": "llamacpp",
+  "workload": "text",
+  "tag": "concurrency-sweep",
+  "timestamp": "20260418_001134",
+  "wall_time_s": 1.602,
+  "config": {
+    "repeats": 3,
+    "max_tokens": 128,
+    "concurrency": "1,2,4",
+    "served_name": "Cosmos-Reason2-2B-Q4_K_M"
+  },
+  "sections": [
+    {
+      "concurrency": 1,
+      "latencies": [
+        {
+          "ttft_ms": 83.56691200060595,
+          "tpot_ms": 29.1796688334216,
+          "tps": 39.98217640257789,
+          "e2e_ms": 258.64492500113556,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        }
+      ]
+    },
+    {
+      "concurrency": 2,
+      "latencies": [
+        {
+          "ttft_ms": 44.4068580000021,
+          "tpot_ms": 28.019732000151027,
+          "tps": 41.63732424922473,
+          "e2e_ms": 212.52525000090827,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        },
+        {
+          "ttft_ms": 267.5986739996006,
+          "tpot_ms": 26.404577500215964,
+          "tps": 44.1842580763553,
+          "e2e_ms": 426.02613900089636,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        }
+      ]
+    },
+    {
+      "concurrency": 4,
+      "latencies": [
+        {
+          "ttft_ms": 34.80223499900603,
+          "tpot_ms": 26.340397666899662,
+          "tps": 44.29191546081873,
+          "e2e_ms": 192.844621000404,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        },
+        {
+          "ttft_ms": 247.67420900025172,
+          "tpot_ms": 26.477138166531706,
+          "tps": 44.06317100166761,
+          "e2e_ms": 406.53703799944196,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        },
+        {
+          "ttft_ms": 459.3124370003352,
+          "tpot_ms": 26.3852403331839,
+          "tps": 44.21663975519624,
+          "e2e_ms": 617.6238789994386,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        },
+        {
+          "ttft_ms": 670.9351440003957,
+          "tpot_ms": 26.46691966644236,
+          "tps": 44.08018316335821,
+          "e2e_ms": 829.7366619990498,
+          "n_tokens": 7,
+          "text": "The capital of France is Paris."
+        }
+      ]
+    }
+  ],
+  "latency_summary": {
+    "1": {
+      "n": 1,
+      "ttft_ms": {
+        "mean": 83.567,
+        "median": 83.567,
+        "p95": 83.567,
+        "min": 83.567,
+        "max": 83.567
+      },
+      "tpot_ms": {
+        "mean": 29.18,
+        "median": 29.18,
+        "p95": 29.18,
+        "min": 29.18,
+        "max": 29.18
+      },
+      "tps": {
+        "mean": 39.982,
+        "median": 39.982,
+        "p95": 39.982,
+        "min": 39.982,
+        "max": 39.982
+      },
+      "e2e_ms": {
+        "mean": 258.645,
+        "median": 258.645,
+        "p95": 258.645,
+        "min": 258.645,
+        "max": 258.645
+      },
+      "total_tokens": 7
+    },
+    "2": {
+      "n": 2,
+      "ttft_ms": {
+        "mean": 156.003,
+        "median": 156.003,
+        "p95": 267.599,
+        "min": 44.407,
+        "max": 267.599
+      },
+      "tpot_ms": {
+        "mean": 27.212,
+        "median": 27.212,
+        "p95": 28.02,
+        "min": 26.405,
+        "max": 28.02
+      },
+      "tps": {
+        "mean": 42.911,
+        "median": 42.911,
+        "p95": 44.184,
+        "min": 41.637,
+        "max": 44.184
+      },
+      "e2e_ms": {
+        "mean": 319.276,
+        "median": 319.276,
+        "p95": 426.026,
+        "min": 212.525,
+        "max": 426.026
+      },
+      "total_tokens": 14
+    },
+    "4": {
+      "n": 4,
+      "ttft_ms": {
+        "mean": 353.181,
+        "median": 353.493,
+        "p95": 670.935,
+        "min": 34.802,
+        "max": 670.935
+      },
+      "tpot_ms": {
+        "mean": 26.417,
+        "median": 26.426,
+        "p95": 26.477,
+        "min": 26.34,
+        "max": 26.477
+      },
+      "tps": {
+        "mean": 44.163,
+        "median": 44.148,
+        "p95": 44.292,
+        "min": 44.063,
+        "max": 44.292
+      },
+      "e2e_ms": {
+        "mean": 511.686,
+        "median": 512.08,
+        "p95": 829.737,
+        "min": 192.845,
+        "max": 829.737
+      },
+      "total_tokens": 28
+    }
+  },
+  "resource_summary": {
+    "n_samples": 3,
+    "ram_used_mb": {
+      "min": 3935,
+      "max": 3939,
+      "mean": 3937.67,
+      "median": 3939
+    },
+    "cpu_pct_mean": {
+      "min": 0.6666666666666666,
+      "max": 2.8333333333333335,
+      "mean": 1.78,
+      "median": 1.83
+    },
+    "temp_gpu_c": {
+      "min": 49.656,
+      "max": 50.625,
+      "mean": 50.18,
+      "median": 50.25
+    },
+    "temp_tj_c": {
+      "min": 49.656,
+      "max": 50.625,
+      "mean": 50.18,
+      "median": 50.25
+    }
+  },
+  "power_summary": {
+    "vdd_in": {
+      "mean_mw": 15899,
+      "peak_mw": 17948,
+      "energy_j": 16.294
+    },
+    "vdd_cpu_gpu_cv": {
+      "mean_mw": 7613,
+      "peak_mw": 8954,
+      "energy_j": 7.837
+    },
+    "vdd_soc": {
+      "mean_mw": 4229.7,
+      "peak_mw": 4558,
+      "energy_j": 4.312
+    }
+  },
+  "tegrastats_samples": [
+    {
+      "t": 1776485494.708321,
+      "raw": "04-18-2026 00:11:34 RAM 3935/7620MB (lfb 4x4MB) SWAP 129/3810MB (cached 1MB) CPU [5%@1036,4%@1036,0%@1036,0%@1036,1%@729,1%@729] GR3D_FREQ 93% cpu@47.375C soc2@46.093C soc0@46.125C gpu@49.656C tj@49.656C soc1@45.187C VDD_IN 12994mW/12994mW VDD_CPU_GPU_CV 5725mW/5725mW VDD_SOC 3763mW/3763mW",
+      "ram_used_mb": 3935,
+      "ram_total_mb": 7620,
+      "swap_used_mb": 129,
+      "cpu_pct_per_core": [
+        5,
+        4,
+        0,
+        0,
+        1,
+        1
+      ],
+      "cpu_pct_mean": 1.8333333333333333,
+      "temp_cpu_c": 47.375,
+      "temp_gpu_c": 49.656,
+      "temp_tj_c": 49.656,
+      "vdd_in_mw": 12994,
+      "vdd_in_avg_mw": 12994,
+      "vdd_cpu_gpu_cv_mw": 5725,
+      "vdd_cpu_gpu_cv_avg_mw": 5725,
+      "vdd_soc_mw": 3763,
+      "vdd_soc_avg_mw": 3763
+    },
+    {
+      "t": 1776485495.214,
+      "raw": "04-18-2026 00:11:35 RAM 3939/7620MB (lfb 4x4MB) SWAP 129/3810MB (cached 1MB) CPU [2%@729,4%@729,3%@729,3%@729,2%@729,3%@729] GR3D_FREQ 93% cpu@47.781C soc2@46.562C soc0@46.406C gpu@50.25C tj@50.25C soc1@45.562C VDD_IN 16755mW/14875mW VDD_CPU_GPU_CV 8160mW/6943mW VDD_SOC 4368mW/4066mW",
+      "ram_used_mb": 3939,
+      "ram_total_mb": 7620,
+      "swap_used_mb": 129,
+      "cpu_pct_per_core": [
+        2,
+        4,
+        3,
+        3,
+        2,
+        3
+      ],
+      "cpu_pct_mean": 2.8333333333333335,
+      "temp_cpu_c": 47.781,
+      "temp_gpu_c": 50.25,
+      "temp_tj_c": 50.25,
+      "vdd_in_mw": 16755,
+      "vdd_in_avg_mw": 14875,
+      "vdd_cpu_gpu_cv_mw": 8160,
+      "vdd_cpu_gpu_cv_avg_mw": 6943,
+      "vdd_soc_mw": 4368,
+      "vdd_soc_avg_mw": 4066
+    },
+    {
+      "t": 1776485495.7195892,
+      "raw": "04-18-2026 00:11:35 RAM 3939/7620MB (lfb 4x4MB) SWAP 129/3810MB (cached 1MB) CPU [0%@729,0%@729,4%@729,0%@729,0%@729,0%@729] GR3D_FREQ 93% cpu@48.312C soc2@46.968C soc0@46.625C gpu@50.625C tj@50.625C soc1@45.625C VDD_IN 17948mW/15899mW VDD_CPU_GPU_CV 8954mW/7613mW VDD_SOC 4558mW/4230mW",
+      "ram_used_mb": 3939,
+      "ram_total_mb": 7620,
+      "swap_used_mb": 129,
+      "cpu_pct_per_core": [
+        0,
+        0,
+        4,
+        0,
+        0,
+        0
+      ],
+      "cpu_pct_mean": 0.6666666666666666,
+      "temp_cpu_c": 48.312,
+      "temp_gpu_c": 50.625,
+      "temp_tj_c": 50.625,
+      "vdd_in_mw": 17948,
+      "vdd_in_avg_mw": 15899,
+      "vdd_cpu_gpu_cv_mw": 8954,
+      "vdd_cpu_gpu_cv_avg_mw": 7613,
+      "vdd_soc_mw": 4558,
+      "vdd_soc_avg_mw": 4230
+    }
+  ]
+}
