@@ -1,0 +1,27 @@
+{
+    "input_file": "device/inputs/trt/ask_action.json",
+    "responses": [
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>I am driving this car and moving forward fast. Describe the scene and tell me what action I should take next.<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/driving.jpg",
+                            "type": "image"
+                        },
+                        {
+                            "text": "I am driving this car and moving forward fast. Describe the scene and tell me what action I should take next.",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "Of course, I see the bicyclist ahead of me, so I should slow down and give them enough space to pass safely.",
+            "request_idx": 0
+        }
+    ]
+}

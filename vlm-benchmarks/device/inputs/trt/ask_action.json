@@ -1,0 +1,11 @@
+{
+  "temperature": 0.0,
+  "max_generate_length": 200,
+  "add_generation_prompt": true,
+  "requests": [
+    {"messages": [{"role": "user", "content": [
+      {"type": "image", "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/driving.jpg"},
+      {"type": "text", "text": "I am driving this car and moving forward fast. Describe the scene and tell me what action I should take next."}
+    ]}]}
+  ]
+}
