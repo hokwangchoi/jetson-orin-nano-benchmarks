@@ -1,0 +1,22 @@
+--- a/cpp/builder/builderUtils.cpp
++++ b/cpp/builder/builderUtils.cpp
+@@ -226,11 +226,14 @@ std::unique_ptr<nvinfer1::IBuilderConfig> createBuilderConfig(nvinfer1::IBuilder
+         LOG_ERROR("Failed to create builder config");
+         return nullptr;
+     }
+-    // Cap kTACTIC_DRAM at 3 GiB to stay below L4T 36.4.7 contiguous alloc cap.
+-    // Default is 75% of unified memory (~5.5 GiB on Orin Nano 8 GB), which lets
+-    // Myelin pick tactics that try ~1 GiB allocs. The JetPack 6.2 security patch
+-    // refuses those. Capping forces smaller tactics at some perf cost.
+-    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kTACTIC_DRAM, 2ULL << 30);
++    // Cap kTACTIC_DRAM at 768 MiB on Orin Nano. Motivation: Myelin fuses the LM
++    // head (/lm_head/MatMul + /Cast, vocab=151936) into a ForeignNode whose
++    // tactic 0 workspace is ~1 GiB contiguous. That exceeds the NvMap/CMA cap
++    // reachable on this hardware (~950 MB max). Setting kTACTIC_DRAM below
++    // tactic 0's request (in theory) makes Myelin skip it and try its 593 MB
++    // fallback. In practice this knob does NOT bind Myelin's autotuner on
++    // TRT 10.3 — kept here for documentation. Real fix is split_lm_head.py.
++    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kTACTIC_DRAM, 768ULL << 20);
+ #if (NV_TENSORRT_MAJOR >= 10 && NV_TENSORRT_MINOR >= 6) || NV_TENSORRT_MAJOR >= 11
+     config->setFlag(nvinfer1::BuilderFlag::kMONITOR_MEMORY);
+ #endif

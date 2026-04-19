@@ -1,0 +1,79 @@
+{
+  "generation": {
+    "average_time_per_token_ms": 16.707477569580078,
+    "average_tokens_per_run": 127.0,
+    "generated_tokens": 127,
+    "tokens_per_second": 59.85344314575195,
+    "total_runs": 1
+  },
+  "multimodal": {
+    "average_time_per_token_ms": 0.0,
+    "total_audio_tokens": 0,
+    "total_audios": 0,
+    "total_image_tokens": 494,
+    "total_images": 1,
+    "total_multimodal_tokens": 494,
+    "total_runs": 1
+  },
+  "peak_unified_memory_bytes": 4539858944,
+  "peak_unified_memory_mb": 4329.546875,
+  "prefill": {
+    "average_time_per_run_ms": 211.12530517578125,
+    "average_time_per_token_ms": 0.41235411167144775,
+    "average_tokens_per_run": 512.0,
+    "computed_tokens": 512,
+    "reused_tokens": 0,
+    "tokens_per_second": 2425.10009765625,
+    "total_runs": 1
+  },
+  "stages": [
+    {
+      "average_time_per_run_ms": 208.2574005126953,
+      "gpu_time_stats": {
+        "count": 1,
+        "max_ms": 208.2574005126953,
+        "mean_ms": 208.2574005126953,
+        "median_ms": 208.2574005126953,
+        "min_ms": 208.2574005126953,
+        "p95_ms": 208.2574005126953,
+        "p99_ms": 208.2574005126953,
+        "stddev_ms": 0.0
+      },
+      "stage_id": "vision_encoder",
+      "total_gpu_time_ms": 208.2574005126953,
+      "total_runs": 1
+    },
+    {
+      "average_time_per_run_ms": 2121.849609375,
+      "gpu_time_stats": {
+        "count": 1,
+        "max_ms": 2121.849609375,
+        "mean_ms": 2121.849609375,
+        "median_ms": 2121.849609375,
+        "min_ms": 2121.849609375,
+        "p95_ms": 2121.849609375,
+        "p99_ms": 2121.849609375,
+        "stddev_ms": 0.0
+      },
+      "stage_id": "llm_generation",
+      "total_gpu_time_ms": 2121.849609375,
+      "total_runs": 1
+    },
+    {
+      "average_time_per_run_ms": 211.12530517578125,
+      "gpu_time_stats": {
+        "count": 1,
+        "max_ms": 211.12530517578125,
+        "mean_ms": 211.12530517578125,
+        "median_ms": 211.12530517578125,
+        "min_ms": 211.12530517578125,
+        "p95_ms": 211.12530517578125,
+        "p99_ms": 211.12530517578125,
+        "stddev_ms": 0.0
+      },
+      "stage_id": "llm_prefill",
+      "total_gpu_time_ms": 211.12530517578125,
+      "total_runs": 1
+    }
+  ]
+}

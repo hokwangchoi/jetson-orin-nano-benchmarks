@@ -1,0 +1,8 @@
+{
+  "temperature": 0.0,
+  "max_generate_length": 64,
+  "add_generation_prompt": true,
+  "requests": [
+    {"messages": [{"role": "user", "content": "What is the capital of France?"}]}
+  ]
+}

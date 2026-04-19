@@ -1,0 +1,12 @@
+{
+  "temperature": 0.0,
+  "max_generate_length": 128,
+  "add_generation_prompt": true,
+  "requests": [
+    {"messages": [{"role": "user", "content": "Write a short paragraph about the importance of renewable energy."}]},
+    {"messages": [{"role": "user", "content": "Write a short paragraph about the importance of renewable energy."}]},
+    {"messages": [{"role": "user", "content": "Write a short paragraph about the importance of renewable energy."}]},
+    {"messages": [{"role": "user", "content": "Write a short paragraph about the importance of renewable energy."}]},
+    {"messages": [{"role": "user", "content": "Write a short paragraph about the importance of renewable energy."}]}
+  ]
+}
