@@ -204,8 +204,8 @@
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
             I set out to benchmark Cosmos-Reason2-2B, NVIDIA's physical-AI VLM, across three inference runtimes on a Jetson Orin Nano 8 GB: <strong>llama.cpp</strong>, <strong>vLLM</strong>, and <strong>TensorRT Edge-LLM</strong>.<br><br>
-            What actually happened: vLLM and TRT-Edge-LLM both got blocked by the same JetPack 6.2.1 memory-allocation bug, in two different ways. NVIDIA shipped a fix (JetPack 6.2.2 / L4T 36.5) mid-work that unblocked one of them. Getting vLLM serving required switching to a community-quantized W4A16 checkpoint and capping the vision encoder's profile-run image size. TRT-Edge-LLM on this specific model is still blocked, pending an upstream fix.<br><br>
-            Final numbers: <strong>vLLM 56 TPS, llama.cpp 38 TPS</strong> on Cosmos-Reason2-2B at W4A16 / Q4_K_M respectively. vLLM wins decode throughput and image first-token latency; llama.cpp wins context length (4096 vs 1024) and has a cleaner startup story. Both hold the model at around 5–7 GB of 8 GB unified memory.<br><br>
+            What actually happened: vLLM and TRT-Edge-LLM both got blocked by the same JetPack 6.2.1 memory-allocation bug, in two different ways. NVIDIA shipped a partial fix (JetPack 6.2.2 / L4T 36.5) mid-work that unblocked one of them with some config tweaks; the other needed a kernel-level CMA change plus an ONNX graph rewrite to get past. As far as I can tell this is the first public report of Cosmos-Reason2-2B running on TRT-Edge-LLM on Orin Nano — NVIDIA's own supported matrix pairs this combination with Thor, not Orin.<br><br>
+            Final numbers: <strong>TRT Edge-LLM 60 TPS, vLLM 56 TPS, llama.cpp 38 TPS</strong> on Cosmos-Reason2-2B at W4A16 / Q4_K_M respectively. TRT wins decode throughput and uses the least memory (4.3 GB peak). vLLM wins image first-token latency when warm (77 ms vs TRT's 420 ms). llama.cpp wins context length (4096 vs 1024) and has a cleaner startup story.<br><br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
@@ -389,7 +389,7 @@ NvMapMemAllocInternalTagged: 1075072515 error 12   (12 retries)
 [ERROR] Failed to build LLM engine.</code></pre>
 
         <p>
-            Same kernel driver, same error signature, different codepath. This isn't PyTorch's NVML assertion — TRT uses raw <code>cudaMalloc</code> through its autotuner. The specific request that fails is exactly 1,075,072,515 bytes (~1 GiB) for a fused "Myelin" subgraph that implements rotary position embeddings. TRT retries 12 times, then falls back to asking for 622 MB — which also fails because by then the memory context is wedged.
+            Same kernel driver, same error signature, different codepath. This isn't PyTorch's NVML assertion — TRT uses raw <code>cudaMalloc</code> through its autotuner. The specific request that fails is exactly 1,075,072,515 bytes (~1 GiB) for a fused "Myelin" subgraph. I originally identified this as the rotary position embedding path; on later re-investigation it turned out to be the <em>LM head output projection</em> — <code>/lm_head/MatMul</code> (2048 × 151936) fused with the fp16→fp32 Cast for logits output. The shape TRT reports just before the failure (<code>Float(151936, 151936, 1)</code>) gives it away: 151936 is the Qwen3 vocab size, and the fallback 622 MB tactic is exactly the fp16 LM head weight matrix. Getting the node identity right mattered later because it redirected the fix: shrinking sequence length can't help, but rewriting the LM head graph can. TRT retries tactic 0 twelve times, then falls back to asking for 622 MB — which also fails because by then the memory context is wedged.
         </p>
 
         <h3>What I tried, what didn't work</h3>
@@ -397,7 +397,7 @@ NvMapMemAllocInternalTagged: 1075072515 error 12   (12 retries)
         <ul>
             <li><strong>Reduce <code>--maxInputLen</code> / <code>--maxKVCacheCapacity</code></strong>. The kernel-level allocation cap is contiguous-size, not total-memory; shrinking the model's working set doesn't help if a single fused kernel still needs 1 GB of scratch space for tactic selection.</li>
             <li><strong>Patch <code>builderUtils.cpp</code> to set <code>kWORKSPACE</code> pool limit.</strong> Accepted by the TensorRT API, ignored by Myelin — the pool limit binds a different codepath.</li>
-            <li><strong>Patch to set <code>kTACTIC_DRAM</code> limit.</strong> Must be a power of 2. Still didn't bind the failing allocation.</li>
+            <li><strong>Patch to set <code>kTACTIC_DRAM</code> limit.</strong> Tried capping at 2 GiB, then 768 MiB (below tactic 0's 1 GiB request). Neither bound the failing allocation — Myelin's autotuner pool is separate from anything <code>IBuilderConfig</code> exposes on TRT 10.3.</li>
             <li><strong>Re-export with <code>--trt_native_ops</code></strong>, which decomposes the Edge-LLM custom attention plugin into stock ONNX ops. The resulting ONNX has an <code>Attention</code> op that TensorRT 10.3's ONNX parser can't consume. Dead end.</li>
             <li><strong>Free as much memory as possible before build</strong> (headless boot, stop docker/snapd/jtop, drop caches). Got to 6.9 GB available. Build still failed at the same allocation — confirming the issue is contiguous-size, not total-memory.</li>
         </ul>
@@ -406,7 +406,7 @@ NvMapMemAllocInternalTagged: 1075072515 error 12   (12 retries)
             At this point the diagnosis is clear: the Myelin subgraph in TRT 10.3 wants one specific 1 GB contiguous allocation, and L4T 36.4.7's NvMap refuses it. Same underlying bug as vLLM's failure, surfacing in a completely different codepath.
         </p>
 
-        <h2>8. The breakthrough: NVIDIA ships a fix</h2>
+        <h2>8. The first breakthrough: NVIDIA ships a partial fix</h2>
 
         <p>
             Mid-investigation, NVIDIA released JetPack 6.2.2 with L4T 36.5.0. The release notes explicitly call out a critical CUDA memory allocation problem introduced in 6.2.1 and describe it as the highest-priority fix in the release.
@@ -431,18 +431,18 @@ sudo reboot</code></pre>
         </p>
 
         <table>
-            <thead><tr><th>Workload</th><th>L4T 36.4.7</th><th>L4T 36.5.0</th></tr></thead>
+            <thead><tr><th>Workload</th><th>L4T 36.4.7</th><th>L4T 36.5.0</th><th>L4T 36.5.0 + workarounds</th></tr></thead>
             <tbody>
-                <tr><td>Bare <code>cudaMalloc</code> 1 GB contiguous</td><td>OK</td><td>OK</td></tr>
-                <tr><td>PyTorch + NVML allocator init (tiny tensor)</td><td style="color:#d32f2f">FAIL</td><td style="color:#2e7d32">OK</td></tr>
-                <tr><td>vLLM load BF16 Cosmos-2B → profile_run</td><td style="color:#d32f2f">FAIL (startup)</td><td style="color:#d32f2f">FAIL (multimodal profiling)</td></tr>
-                <tr><td>vLLM load W4A16 Cosmos-2B → serve</td><td>not tried</td><td style="color:#2e7d32">OK (§9)</td></tr>
-                <tr><td>TRT Edge-LLM engine build, Myelin subgraph</td><td style="color:#d32f2f">FAIL</td><td style="color:#d32f2f">FAIL</td></tr>
+                <tr><td>Bare <code>cudaMalloc</code> 1 GB contiguous</td><td>OK</td><td>OK</td><td>OK</td></tr>
+                <tr><td>PyTorch + NVML allocator init (tiny tensor)</td><td style="color:#d32f2f">FAIL</td><td style="color:#2e7d32">OK</td><td style="color:#2e7d32">OK</td></tr>
+                <tr><td>vLLM load BF16 Cosmos-2B → profile_run</td><td style="color:#d32f2f">FAIL (startup)</td><td style="color:#d32f2f">FAIL (multimodal profiling)</td><td>not tried</td></tr>
+                <tr><td>vLLM load W4A16 Cosmos-2B → serve</td><td>not tried</td><td style="color:#2e7d32">OK (§9)</td><td style="color:#2e7d32">OK (§9)</td></tr>
+                <tr><td>TRT Edge-LLM engine build, LM head subgraph</td><td style="color:#d32f2f">FAIL</td><td style="color:#d32f2f">FAIL</td><td style="color:#2e7d32">OK (§10)</td></tr>
             </tbody>
         </table>
 
         <p>
-            <strong>The fix is partial.</strong> L4T 36.5 resolves the tiny-allocation NVML path, so PyTorch can initialize. But loading a 5 GB BF16 model still triggers a variant of the same bug at the multimodal profiling stage — the ViT positional-embedding path asks for a contiguous 1 GB allocation and gets the same rejection. TRT-Edge-LLM's Myelin autotuner hits the same wall.
+            <strong>The fix is partial.</strong> L4T 36.5 resolves the tiny-allocation NVML path, so PyTorch can initialize. But loading a 5 GB BF16 model still triggers a variant of the same bug at the multimodal profiling stage — the ViT positional-embedding path asks for a contiguous 1 GB allocation and gets the same rejection. TRT-Edge-LLM's Myelin autotuner hits the same wall out of the box. §9 and §10 describe how both got past it.
         </p>
 
         <h2>9. After the fix: vLLM with W4A16</h2>
@@ -540,41 +540,109 @@ Swap:             0B          0B          0B</code></pre>
                     <th>TTFT image</th>
                     <th>TPOT</th>
                     <th>TPS</th>
+                    <th>Peak mem</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">58 ms</td><td class="num">306 ms</td><td class="num">27 ms</td><td class="num">38</td></tr>
-                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">77 ms</td><td class="num">17 ms</td><td class="num">56</td></tr>
-                <tr><td>TRT Edge-LLM</td><td>W4A16 AWQ</td><td class="num">—</td><td class="num">blocked</td><td class="num">blocked</td><td class="num">—</td><td class="num">—</td></tr>
+                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">58 ms</td><td class="num">306 ms</td><td class="num">27 ms</td><td class="num">38</td><td class="num">—</td></tr>
+                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">77 ms</td><td class="num">17 ms</td><td class="num">56</td><td class="num">6.9 GB</td></tr>
+                <tr><td>TRT Edge-LLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">29 ms</td><td class="num">420 ms</td><td class="num">17 ms</td><td class="num">60</td><td class="num">4.3 GB</td></tr>
             </tbody>
         </table>
 
         <p>
-            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. <strong>vLLM leads on decode (56 vs 38 TPS)</strong>, on TPOT (17 vs 27 ms), and on first-token latency for image workloads (77 vs 306 ms) once the vision encoder has warmed up. llama.cpp matches vLLM on text TTFT and supports a 4× longer context out of the box. TRT Edge-LLM is still blocked on the NvMap/Myelin issue from §8; whenever that lands upstream it should close the gap and probably exceed vLLM, since it compiles to a single fused engine with no Python in the path.
+            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. Three distinct winners depending on what you optimize for. <strong>TRT leads on decode (60 vs 56 TPS)</strong>, on text TTFT (29 ms, 2× faster than either alternative), and on peak memory (4.3 GB vs vLLM's 6.9 GB — a 37% reduction). <strong>vLLM wins image TTFT post-warmup</strong> (77 ms vs TRT's 420 ms) because its vision encoder gets lazily compiled into CUDA graphs on first use and cached for subsequent requests. TRT pays the full ~200 ms ViT cost every time. <strong>llama.cpp loses on speed but wins context length</strong> (4096 vs 1024) — the only runtime on this hardware that can handle long reasoning traces. The TRT row took the most work to get: see §10 for what it took.
         </p>
 
         <p>
-            Why vLLM wins decode on this workload: the W4A16 AWQ weights dispatch through vLLM's Marlin GEMM kernels (<code>Using MarlinLinearKernel for CompressedTensorsWNA16</code>), which are tuned for Ampere tensor cores and do on-the-fly INT4→FP16 dequantization in the GEMM prologue. llama.cpp's Q4_K_M GGUF goes through ggml-cuda kernels that are excellent but more general-purpose; they don't specialize as aggressively for SM 8.7. Both runtimes are memory-bandwidth-bound on a 2B model — the 68 GB/s ceiling on Orin Nano's LPDDR5 caps everyone — but Marlin's kernel shape gets closer to that ceiling.
+            The TPOT numbers deserve a closer look. llama.cpp, vLLM and TRT are all memory-bandwidth-bound on a 2B model at batch 1 — Orin Nano's 68 GB/s LPDDR5 caps everyone — so the decode gap is small in absolute terms (10 ms between fastest and slowest). Where the numbers separate more is TTFT: llama.cpp and vLLM both fuse prefill aggressively but use very different kernel paths, and TRT's pre-compiled engine is just dense TensorRT tactics on the hot path. The 29 ms text TTFT is pure prefill time on a short prompt — no startup overhead, no tokenization surprise. That number is what vLLM approaches for cached prompts and llama.cpp approaches for the first generate call after a reuse hit.
         </p>
 
         <p>
-            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, multiplied by the number of layers times the number of KV heads. On a 2B model at 8 GB with 5 GB already spoken for by weights, graphs, and vision encoder activations, 1024 is the largest context that still passes the startup sanity check. llama.cpp allocates KV cache on demand per active slot rather than reserving the full max-context budget upfront, and uses mmap for weights so the OS can swap cold weight pages to disk. 4096 context fits without drama. This is a real functional difference, not a benchmark artifact: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
+            Why vLLM wins decode over llama.cpp (but loses to TRT): the W4A16 AWQ weights dispatch through vLLM's Marlin GEMM kernels (<code>Using MarlinLinearKernel for CompressedTensorsWNA16</code>), which are tuned for Ampere tensor cores and do on-the-fly INT4→FP16 dequantization in the GEMM prologue. llama.cpp's Q4_K_M GGUF goes through ggml-cuda kernels that are excellent but more general-purpose. TRT uses its own <code>Int4GroupwiseGemmPlugin</code> (PluginV3), which is one of a small number of hand-tuned plugins that ship with Edge-LLM — roughly the same kernel family as Marlin but wired directly into a fused CUDA graph with no Python in the path. That's where the ~3.5 ms TPOT advantage over vLLM comes from.
         </p>
 
-        <h2>10. Future work: TRT Edge-LLM when the bug is fixed</h2>
-
         <p>
-            The TRT-Edge-LLM Myelin issue on Cosmos-Reason2-2B is a known, reproducible failure on JetPack 6.2.2 / L4T 36.5 / TRT 10.3. The most likely resolution paths are:
+            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, multiplied by the number of layers times the number of KV heads. On a 2B model at 8 GB with 5 GB already spoken for by weights, graphs, and vision encoder activations, 1024 is the largest context that still passes the startup sanity check. TRT Edge-LLM has the same structural limit — max KV cache capacity is baked into the engine at build time. llama.cpp allocates KV cache on demand per active slot rather than reserving the full max-context budget upfront, and uses mmap for weights so the OS can swap cold weight pages to disk. 4096 context fits without drama. This is a real functional difference, not a benchmark artifact: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
         </p>
 
-        <ol>
-            <li><strong>NVIDIA patches the NvMap path that Myelin uses.</strong> They've shown they're willing to patch this area (the L4T 36.5 release did exactly that for one path). The forum thread is long and active; this is a tracked issue.</li>
-            <li><strong>TensorRT 10.4+ lands on Jetson.</strong> Newer TRT versions have different autotuner behavior, and Myelin has been reworked. JetPack 6.3 is likely to ship an updated TRT.</li>
-            <li><strong>The Edge-LLM team ships a workaround.</strong> Could be in the export pipeline (force a decomposition that avoids the Myelin fusion), or in the builder (explicit tactic filtering).</li>
-        </ol>
+        <h2>10. Past the second wall: three interventions to get TRT Edge-LLM building</h2>
 
         <p>
-            The quantized ONNX for Cosmos-2B sits on my drive. When any of those paths lands, the retry is 20 minutes. I'll post an update.
+            The TRT blocker from §7 stayed closed for a while. The notes I wrote at the time concluded the Myelin autotuner behavior was a fixed property of TRT 10.3 on L4T 36.5 and the fix would need to come from upstream. That turned out to be half right — no combination of TRT builder flags or source patches fixes it from inside Edge-LLM. But a kernel-level CMA change plus an ONNX graph rewrite bypass the problem cleanly. Here's what that took.
+        </p>
+
+        <h3>Correctly identifying the failing node</h3>
+
+        <p>
+            The error message reports "<code>{ForeignNode[/Unsqueeze.../Cast]}</code>", which is TRT shorthand for a fused subgraph whose first op is an Unsqueeze and whose last op is a Cast. I originally guessed this was the rotary position embedding math. It isn't — it's the LM head. Tracing the actual ONNX graph, the fused region runs from <code>/GatherND</code> (picks the last-token hidden state) through <code>/lm_head/MatMul</code> (the 2048 × 151936 projection to vocab logits) to <code>/Cast</code> (fp16 → fp32 for the logits output).
+        </p>
+
+        <p>
+            The allocation sizes confirm it. Tactic 0's 1,075,072,515 bytes is roughly <code>1.5 × 151936 × 2048 × 2</code> — Myelin's workspace for the fused kernel. The 622,329,856-byte fallback allocation is exactly <code>2 × 2048 × 151936</code>, the fp16 LM head weight matrix. The embedding tensor in the ONNX export on disk is 622,329,944 bytes, within a few bytes of the same number. It's the LM head, fused with the logits cast.
+        </p>
+
+        <p>
+            Getting the node identity right mattered because it told me which interventions could and couldn't help. Shrinking <code>--maxInputLen</code> can't help: the allocation is <em>vocab × hidden</em>, not <em>seq_len × hidden</em>. Neither can reducing batch size. But rewriting the LM head to break the fusion boundary can, because then Myelin has two smaller candidates to pick from instead of one big one.
+        </p>
+
+        <h3>Intervention 1: enlarge the CMA pool</h3>
+
+        <p>
+            Default Jetson CMA (the kernel's Contiguous Memory Allocator) is 256 MiB. Myelin's tactic 0 wants 1,075 MiB contiguous; it falls back to a 593 MiB tactic if tactic 0 fails cleanly. With 256 MiB CMA, neither fits, and tactic 0's 12 failed retries progressively exhaust the pool so that by the time the fallback runs, no contiguous memory is free. The behavior I actually observed matched this exactly: once I started watching <code>CmaFree</code> in <code>/proc/meminfo</code> during a build, I saw the pool drain to 0 during tactic 0's retry loop.
+        </p>
+
+        <p>
+            Setting <code>cma=950M</code> on the kernel command line (via <code>/boot/extlinux/extlinux.conf</code>) raises the pool to 960 MiB. Why 950M and not 2G: Jetson's low physical memory comes in two ~992 MiB chunks separated by a 64 MiB firmware carveout, and the ARM64 kernel hardcodes CMA placement below 4 GiB — <code>cma=2G@0x100000000-0x280000000</code> is rejected with "<code>exceeds limit (0x100000000)</code>". 950M is effectively the ceiling on this hardware — the largest value that fits in one of the 992 MiB low-memory chunks with some slack.
+        </p>
+
+        <p>
+            With 960 MiB CMA, tactic 0 still exceeds the pool (1025 > 960), but it now fails on a fast size check rather than wedging the pool through partial allocations. The CMA trace makes the difference visible. Failing run, default 256 MiB CMA:
+        </p>
+
+        <pre><code class="language-text">19:59:09  CmaFree 779 MB   ← idle, just before Myelin starts the LM head
+19:59:13  CmaFree  36 MB   ← tactic 0 retry 4 or so
+19:59:14  CmaFree   0 MB   ← pool wedged
+19:59:18  CmaFree   0 MB
+19:59:21  CmaFree 932 MB   ← released only after the build error propagates</code></pre>
+
+        <p>
+            Succeeding run, 960 MiB CMA plus the surgery below: <code>CmaFree</code> briefly drops to ~350 MB during tactic 1's 593 MB allocation and then cleanly releases. No wedging, no retry loop.
+        </p>
+
+        <h3>Intervention 2: ONNX graph surgery to split the LM head</h3>
+
+        <p>
+            CMA expansion alone isn't enough — tactic 0 gets attempted first and its 1025 MB request still fails. The clean fix is to stop Myelin from ever trying tactic 0, by preventing it from fusing the LM head into a single node that needs such a large scratch space.
+        </p>
+
+        <p>
+            The surgery splits the 2048 × 151936 LM head MatMul along the vocab dimension into two 2048 × 75968 halves, then stitches the outputs back together with a <code>Concat(axis=-1)</code>. Two smaller fusion candidates each well under 600 MiB tactic scratch. Output is mathematically identical — this is a graph rewrite, not a model change.
+        </p>
+
+        <pre><code class="language-text">Before:                             After:
+                                                    ┌─ MatMul_lo (2048 × 75968) ─┐
+... → GatherND → MatMul → Cast →    ... → GatherND ─┤                            ├─ Concat → Cast →
+              (2048×151936)                         └─ MatMul_hi (2048 × 75968) ─┘</code></pre>
+
+        <p>
+            First attempt used <code>Identity</code> nodes as fusion barriers. That didn't work: TRT's graph optimizer constant-folds and removes Identity nodes before Myelin runs its pattern matcher. <code>Concat</code> is a real data-rearranging op and the optimizer leaves it in place. With the split in place the build completes in about ten minutes. The script is <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks/blob/master/vlm-benchmarks/device/trt_cosmos_patches/split_lm_head.py"><code>split_lm_head.py</code></a> in the repo.
+        </p>
+
+        <h3>Intervention 3 (documentary): patching <code>kTACTIC_DRAM</code></h3>
+
+        <p>
+            I also tried a one-line patch to <code>cpp/builder/builderUtils.cpp</code> changing <code>setMemoryPoolLimit(kTACTIC_DRAM, 2ULL &lt;&lt; 30)</code> to <code>768ULL &lt;&lt; 20</code> — the theory being that a 768 MiB cap below tactic 0's 1 GiB request would make Myelin skip it. It doesn't. The <code>kTACTIC_DRAM</code> pool binds a different codepath; Myelin's autotuner has its own scratch pool that <code>IBuilderConfig</code> does not reach on TRT 10.3. I left the patch in the repo as documentary record of what was tried, with a comment in the source. Future TRT versions may wire this pool through, at which point the patch would start being useful and could replace the graph surgery.
+        </p>
+
+        <h3>Cost of the workaround</h3>
+
+        <p>
+            The split introduces one extra kernel launch (the Concat) per forward pass. At batch 1 this is microseconds — not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code>, produces a fluent description of the bus image ("two individuals walking side by side on a paved sidewalk... a blue bus with a white roof and a green logo parked on the street..."), and benchmarks at 60 TPS decode — matching vLLM within the memory-bandwidth ceiling on this hardware.
+        </p>
+
+        <p>
+            The full diagnostic writeup — including what <em>didn't</em> work (reducing seq_len, the kWORKSPACE patch, <code>--trt_native_ops</code> re-export, Identity barriers) — is in <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks/blob/master/vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md"><code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code></a>.
         </p>
 
         <h2>11. What I actually learned</h2>
@@ -601,10 +669,20 @@ Swap:             0B          0B          0B</code></pre>
 
         <h3>Portability vs. optimality, made concrete</h3>
         <p>
-            llama.cpp ships pre-compiled generic CUDA kernels that run on any SM and allocates memory in small chunks. TRT Edge-LLM benchmarks kernel variants on your specific silicon at build time and asks the driver for large contiguous scratch buffers. llama.cpp's approach is why it kept running when the NvMap bug surfaced — it never triggered it. TRT's approach is what you want in production when the build succeeds — a fully-fused engine with predictable latency.
+            llama.cpp ships pre-compiled generic CUDA kernels that run on any SM and allocates memory in small chunks. TRT Edge-LLM benchmarks kernel variants on your specific silicon at build time and asks the driver for large contiguous scratch buffers. llama.cpp's approach is why it kept running when the NvMap bug surfaced — it never triggered it. TRT's approach is what you want in production when the build succeeds: a fully-fused engine with predictable 17 ms per-token latency and a 4.3 GB memory footprint, 37% less than vLLM on the same model. The cost of that predictability is the 10-minute build, the CMA kernel parameter, and the ONNX surgery from §10. Fair trade if the deployment is stable; painful if you're iterating on model variants.
         </p>
         <p>
-            vLLM sits in between: a general-purpose Python + PyTorch serving layer with specialized kernels (Marlin for W4A16, FlashAttention for prefill, CUDA graphs for decode) wired in for the hot paths. That mix is why it beats llama.cpp's more uniform ggml-cuda kernels on decode throughput for this specific quantization, while still running without a per-device build step. The price is a bigger steady-state memory footprint and a more fragile startup path — the same reasons the NvMap bug hit it harder than it hit llama.cpp. Three different answers to the same portability-vs-optimality tradeoff, and on this hardware the middle answer happens to win on throughput.
+            vLLM sits in between: a general-purpose Python + PyTorch serving layer with specialized kernels (Marlin for W4A16, FlashAttention for prefill, CUDA graphs for decode) wired in for the hot paths. That mix is why it beats llama.cpp's more uniform ggml-cuda kernels on decode throughput for this specific quantization, while still running without a per-device build step. The price is a bigger steady-state memory footprint and a more fragile startup path — the same reasons the NvMap bug hit it harder than it hit llama.cpp. Three different answers to the same portability-vs-optimality tradeoff, and on this hardware the answer that wins depends on which metric you're optimizing for.
+        </p>
+
+        <h3>Vendor support matrices are lower bounds, not ceilings</h3>
+        <p>
+            NVIDIA's Jetson AI Lab tutorial pairs Cosmos-Reason2 <em>8B</em> with Thor (128 GB unified memory) and pairs Orin Nano with Qwen3-4B-Instruct — a text-only LLM, not a VLM. There's no official recipe anywhere for Cosmos-Reason2-2B on Orin Nano via TRT-Edge-LLM. That absence is informative: it tells you NVIDIA's engineers found the combination unpleasant enough to route it out of their tutorials. It isn't a ban, though. With a kernel-level CMA change and an ONNX graph rewrite, the combination works and performs competitively. "Not officially supported" on an edge platform often means "works after you do the platform-level work to make it work" — not "actually impossible."
+        </p>
+
+        <h3>Watch the allocator, not the model</h3>
+        <p>
+            Two of the three bugs I hit on this project were allocator bugs, not model bugs. vLLM's startup failure was a CUDA caching allocator assertion caused by NVML disagreeing with the kernel driver. TRT Edge-LLM's build failure was the kernel's CMA pool exhausting under Myelin's retry behavior. Both looked like model problems at first glance — "the VLM doesn't fit" — but the root causes were downstream of anything you'd find by reading the model architecture. On memory-constrained edge hardware, live-instrumenting the allocator (<code>/proc/meminfo</code>, <code>CmaFree</code>, per-process NvMap tracking) is more often the right move than reading more TRT docs.
         </p>
 
         <h2>12. Reproducing this</h2>
@@ -625,11 +703,15 @@ cat device/README.md  # L4T upgrade section
 # Streaming benchmark against vLLM (or llama.cpp — same OpenAI API)
 python3 benchmarks/bench_vllm.py --model embedl/Cosmos-Reason2-2B-W4A16
 
-# TRT Edge-LLM on Cosmos-2B is currently blocked — see:
-cat notes/trt_edgellm_cosmos_blocker.md      # what goes wrong, and why</code></pre>
+# TRT Edge-LLM path (requires the workarounds from §10)
+cat device/trt_cosmos_patches/README.md             # CMA config, ONNX surgery
+python3 device/trt_cosmos_patches/split_lm_head.py  # one-time graph rewrite
+./device/scripts/40_build_cosmos_trt_engines.sh     # build LLM + visual engines
+./device/scripts/41_sanity_cosmos_trt.sh            # verify output correctness
+./device/scripts/42_bench_cosmos_trt.sh             # 5-run TTFT/TPOT/TPS</code></pre>
 
         <p>
-            Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, and methodology notes are all in <code>vlm-benchmarks/assets/results/</code>.
+            Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, CMA traces, and methodology notes are all in <code>vlm-benchmarks/device/results/</code> and <code>vlm-benchmarks/assets/results/</code>. Investigation writeups for the TRT workaround are in <code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code>.
         </p>
 
         <footer>

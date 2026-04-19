@@ -92,10 +92,15 @@ Only one server can listen on port 8000 at a time — stop the previous
 one before starting the next. Each script is idempotent and checks for
 existing outputs.
 
-TRT Edge-LLM on Cosmos-2B is currently blocked on an NvMap/Myelin issue
-in the TensorRT 10.3 autotuner; see
-[`../notes/trt_edgellm_cosmos_blocker.md`](../notes/trt_edgellm_cosmos_blocker.md)
-for the investigation.
+TRT Edge-LLM on Cosmos-2B required additional setup beyond what NVIDIA's
+standard tutorial covers — a kernel-level `cma=950M` parameter and an
+ONNX graph rewrite to split the LM head MatMul. The full operator-facing
+recipe is in
+[`trt_cosmos_patches/README.md`](./trt_cosmos_patches/README.md);
+the investigation writeup is in
+[`../notes/trt_edgellm_cosmos_resolution.md`](../notes/trt_edgellm_cosmos_resolution.md).
+Build and benchmark with `./scripts/40_build_cosmos_trt_engines.sh`,
+`./scripts/41_sanity_cosmos_trt.sh`, and `./scripts/42_bench_cosmos_trt.sh`.
 
 ## Profiling gotchas
 

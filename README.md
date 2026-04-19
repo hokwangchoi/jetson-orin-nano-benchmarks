@@ -32,11 +32,11 @@ YOLOv8 object detection across the full optimization pipeline:
 
 **[Read the blog post →](https://hokwangchoi.com/blog/vision-benchmarks/)**
 
-### [Vision Language Models](./vlm-benchmarks/) — 🚧 in progress
+### [Vision Language Models](./vlm-benchmarks/) — ✅ complete
 
 A 2B-parameter VLM on 8GB unified memory, across three inference
-runtimes. Intended as a straight comparison on the same model
-(Cosmos-Reason2-2B); ended up as a case study in platform fragility.
+runtimes. Same model (Cosmos-Reason2-2B), same quantization class
+(INT4 weights, FP16 activations), same hardware.
 
 - **Model**: Cosmos-Reason2-2B (Qwen3-VL-2B post-trained for physical reasoning)
 - **Runtimes**: llama.cpp (ggml C runtime) vs vLLM (PyTorch + PagedAttention)
@@ -46,7 +46,11 @@ runtimes. Intended as a straight comparison on the same model
   released a partial fix (JetPack 6.2.2). vLLM now works with a
   community-quantized W4A16 checkpoint (Embedl) plus a vision-encoder
   profile cap that keeps startup allocations under the Orin Nano's
-  NvMap limit. TRT-Edge-LLM on Cosmos-2B is still blocked.
+  NvMap limit. TRT-Edge-LLM was the harder of the two — required a
+  kernel-level CMA change plus an ONNX graph rewrite (splitting the LM
+  head MatMul) to get past Myelin's 1 GiB tactic scratch request. As
+  far as I can tell this is the first public report of Cosmos-Reason2-2B
+  running on TRT-Edge-LLM on an Orin Nano.
 - **Metrics**: TTFT, TPOT, TPS, peak/steady-state memory
 - **Angle**: robotics and AV perception workloads — what does it
   actually take to deploy a production inference runtime on a 2026 edge
@@ -89,20 +93,27 @@ python3 benchmark_yolov8.py
 
 ### VLM Inference (Orin Nano 8GB, MAXN_SUPER, JetPack 6.2.2)
 
-| Runtime          | Model                | Quant    | Context | TTFT (text) | TTFT (img) | TPOT | TPS |
-|------------------|----------------------|----------|--------:|------------:|-----------:|-----:|----:|
-| llama.cpp        | Cosmos-Reason2-2B    | Q4_K_M   |    4096 |       58 ms |     306 ms |27 ms |  38 |
-| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  1024 |       61 ms |      77 ms |17 ms |  56 |
-| TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|       — |   *blocked* |  *blocked* |    — |   — |
+| Runtime          | Model                | Quant    | Context | TTFT (text) | TTFT (img) | TPOT | TPS | Peak mem |
+|------------------|----------------------|----------|--------:|------------:|-----------:|-----:|----:|---------:|
+| llama.cpp        | Cosmos-Reason2-2B    | Q4_K_M   |    4096 |       58 ms |     306 ms |27 ms |  38 |        — |
+| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  1024 |       61 ms |      77 ms |17 ms |  56 |   6.9 GB |
+| TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|    1024 |       29 ms |     420 ms |17 ms |  60 |   4.3 GB |
 
-*All values are medians of 5 streaming runs captured by `benchmarks/bench_vllm.py`.
+*All values are medians of 5 streaming runs captured by `benchmarks/bench_vllm.py`
+(llama.cpp and vLLM) and `device/scripts/42_bench_cosmos_trt.sh` (TRT Edge-LLM).
 Text runs: 128 output tokens. Image runs: full-size `bus.jpg`, up to 128
 output tokens. vLLM image TTFT is the steady-state value (runs 2–5); the
 first image request in any batch takes 0.5–3 s because the ViT path is
-not CUDA-graph-captured and compiles lazily per unique input shape.*
-*TRT Edge-LLM + Cosmos-2B: blocked on NvMap/Myelin bug, see
-[`vlm-benchmarks/notes/trt_edgellm_cosmos_blocker.md`](./vlm-benchmarks/notes/trt_edgellm_cosmos_blocker.md).
-Retry planned when NVIDIA patches the upstream issue.*
+not CUDA-graph-captured and compiles lazily per unique input shape. TRT
+Edge-LLM image TTFT does not have the same warmup effect — its visual
+engine always runs (~208 ms) per request.*
+
+*TRT Edge-LLM + Cosmos-2B on Orin Nano required workarounds that go
+beyond the standard tutorial path: a `cma=950M` kernel parameter plus an
+ONNX graph rewrite splitting the LM head MatMul to avoid Myelin's 1 GiB
+tactic scratch. See [`vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md`](./vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md)
+for the full investigation and [`vlm-benchmarks/device/trt_cosmos_patches/`](./vlm-benchmarks/device/trt_cosmos_patches/)
+for the patches and scripts.*
 
 ## Repository Structure
 

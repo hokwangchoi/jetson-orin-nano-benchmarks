@@ -4,10 +4,15 @@ Running a 2B-parameter vision-language model on 8 GB of unified memory
 — and measuring what really matters when you take it off the data-center
 rack and put it on an edge device.
 
-The short version: **three inference runtimes, one platform bug,
-two of them working — one of them (vLLM) requiring a community-quantized
-W4A16 checkpoint and a vision-encoder profile cap to fit on 8 GB**. See
-the [blog post](./index.html) for the full story.
+The short version: **three inference runtimes on the same model, same
+hardware, all three working**. Getting vLLM serving required a
+community-quantized W4A16 checkpoint and a vision-encoder profile cap.
+Getting TRT-Edge-LLM building took more: a kernel-level CMA change, an
+ONNX graph rewrite to split the LM head MatMul, and careful CMA-pressure
+watching during the build. As far as I can tell this is the first public
+report of Cosmos-Reason2-2B running on TRT-Edge-LLM on an Orin Nano —
+NVIDIA's own supported matrix pairs this combination with Thor, not
+Orin. See the [blog post](./index.html) for the full story.
 
 ## Why VLMs on the edge?
 
@@ -65,7 +70,7 @@ a community port that's about 1.1 GB on disk.
 | Batching              | Slot pool (`--parallel N`)       | PagedAttention + chunked prefill | Static batch size at build time  |
 | KV cache              | Contiguous per slot              | Paged, virtualized               | Preallocated contiguous          |
 | Cold start            | ~5–10 s (mmap GGUF)              | ~2–3 min (weight load + warmup)  | ~5–10 s (engine load)            |
-| Model used here       | Cosmos-Reason2-2B Q4_K_M         | Cosmos-Reason2-2B W4A16 (Embedl) | blocked — see notes               |
+| Model used here       | Cosmos-Reason2-2B Q4_K_M         | Cosmos-Reason2-2B W4A16 (Embedl) | Cosmos-Reason2-2B W4A16 (split LM head — see notes) |
 
 Each end-point answers the same benchmark questions, but the runtimes
 come from very different design philosophies. llama.cpp is the generic,
@@ -89,12 +94,16 @@ contiguous allocations — see the blog post for the full forensics.
   multimodal profiling).
 - **TRT Edge-LLM** — the Myelin autotuner's 1 GB scratch-buffer request
   during engine build gets rejected, with the exact error signature
-  `NvMapMemAllocInternalTagged: 1075072515 error 12`. Specific to the
-  Qwen3-VL-shaped RoPE fused subgraph. Not fixed by 6.2.2.
+  `NvMapMemAllocInternalTagged: 1075072515 error 12`. Node turned out
+  to be the LM head output projection (vocab=151936), not RoPE as
+  initially diagnosed. Not fixed by 6.2.2 — required a separate
+  workaround (see resolution notes).
 
 JetPack 6.2.2 / L4T 36.5.0 resolves the startup-level path. vLLM now
-serves Cosmos-2B if you use a pre-quantized W4A16 checkpoint and the
-memory-constrained config NVIDIA published for Orin Super Nano.
+serves Cosmos-2B if you use a pre-quantized W4A16 checkpoint and cap
+the vision encoder profile. TRT Edge-LLM needs additional kernel-level
+work (CMA pool expansion) plus an ONNX graph rewrite to split the LM
+head — both documented in `device/trt_cosmos_patches/README.md`.
 
 ## Current runtime status
 
@@ -102,11 +111,12 @@ memory-constrained config NVIDIA published for Orin Super Nano.
 |---------|-------|--------|
 | llama.cpp | Cosmos-Reason2-2B Q4_K_M | ✅ serving, benchmarked (TPS = 38) |
 | vLLM | Cosmos-Reason2-2B W4A16 (Embedl) | ✅ serving, benchmarked (TPS = 56) |
-| TRT Edge-LLM | Cosmos-Reason2-2B W4A16 | ❌ blocked on Myelin subgraph, see [`notes/trt_edgellm_cosmos_blocker.md`](./notes/trt_edgellm_cosmos_blocker.md) |
+| TRT Edge-LLM | Cosmos-Reason2-2B W4A16 | ✅ engine built + benchmarked (TPS = 60), after CMA config + ONNX graph surgery — see [`notes/trt_edgellm_cosmos_resolution.md`](./notes/trt_edgellm_cosmos_resolution.md) |
 
-Asymmetry: llama.cpp runs at context 4096, vLLM at context 1024 (the
-fit-in-memory ceiling). TRT Edge-LLM is pending an upstream fix for
-the NvMap/Myelin issue — numbers will be added when that lands.
+Asymmetry: llama.cpp runs at context 4096, vLLM and TRT Edge-LLM at
+context 1024 (the fit-in-memory ceiling on 8 GB). TRT Edge-LLM's path
+also required kernel-level setup that isn't in NVIDIA's standard
+tutorial — see the runtime's README in `device/trt_cosmos_patches/`.
 
 ## What each runtime measures
 
@@ -146,10 +156,9 @@ sudo reboot
 | 1c    | Orin Nano | Download Cosmos-Reason2-2B GGUF, merge splits, quantize to Q4_K_M. | ✅ |
 | 2a    | Orin Nano | llama.cpp — launch server, run text + image benchmarks, concurrency sweep. | ✅ |
 | 2b    | Orin Nano | vLLM — launch server with Embedl W4A16, run benchmark suite. | ✅ |
-| 2c    | Orin Nano | TRT Edge-LLM — blocked on NvMap/Myelin bug, investigation documented. | ❌ (upstream fix pending) |
+| 2c    | Orin Nano | TRT Edge-LLM — kernel CMA setup (`cma=950M`), ONNX graph surgery (split LM head), engine build, text + image benchmarks. | ✅ |
 | 3     | Orin Nano | Capture Nsight profiles for the same prompt on each runtime. | ⏳ |
 | 4     | Anywhere  | Plots, roofline analysis, writeup. | ⏳ |
-| 5     | Future    | Retry TRT Edge-LLM on Cosmos-Reason2-2B once NVIDIA patches the Myelin NvMap path. | ⏳ |
 
 ## Reproducing
 
@@ -163,9 +172,16 @@ cat device/README.md                     # JetPack upgrade, MAXN_SUPER, swap
 cat device/scripts/10_prepare_llamacpp.sh
 cat device/scripts/11_run_llamacpp_server.sh
 cat device/scripts/03_run_vllm_server.sh
-cat notes/trt_edgellm_cosmos_blocker.md  # TRT Edge-LLM blocker writeup
 
-# Streaming benchmark against any OpenAI-compatible endpoint:
+# TRT Edge-LLM path (requires the CMA + ONNX surgery workarounds)
+cat device/trt_cosmos_patches/README.md  # operator-facing recipe
+cat notes/trt_edgellm_cosmos_resolution.md  # full investigation narrative
+python3 device/trt_cosmos_patches/split_lm_head.py  # one-time graph rewrite
+./device/scripts/40_build_cosmos_trt_engines.sh     # build LLM + visual engines
+./device/scripts/41_sanity_cosmos_trt.sh            # verify correct outputs
+./device/scripts/42_bench_cosmos_trt.sh             # 5-run TTFT/TPOT/TPS
+
+# Streaming benchmark against any OpenAI-compatible endpoint (llama.cpp or vLLM):
 python3 benchmarks/bench_vllm.py --url http://localhost:8000 \
     --model embedl/Cosmos-Reason2-2B-W4A16
 ```
@@ -181,8 +197,11 @@ vlm-benchmarks/
 │   └── calibration/           # shared calibration set
 ├── device/                    # Phase 1-2 — Jetson
 │   ├── README.md              # JetPack upgrade + hardware setup
-│   ├── scripts/               # 03_* vLLM, 10_*/11_* llama.cpp, 30_* TRT (when unblocked)
-│   └── configs/               # per-runtime parameters
+│   ├── scripts/               # 03_* vLLM, 10_*/11_* llama.cpp, 40_-42_* TRT
+│   ├── configs/               # per-runtime parameters
+│   ├── inputs/trt/            # TRT benchmark prompt files
+│   ├── results/trt/           # TRT per-run timing JSONs, logs
+│   └── trt_cosmos_patches/    # CMA recipe, split_lm_head.py, source patch
 ├── benchmarks/                # Phase 2-3 — runtime-agnostic harness
 │   ├── harness.py             # orchestrator (tegrastats + power + latency)
 │   ├── bench_vllm.py          # streaming TTFT/TPOT benchmark
@@ -192,8 +211,8 @@ vlm-benchmarks/
 │   └── profiling/             # Nsight + roofline
 ├── analysis/                  # Phase 4 — post-processing
 │   └── plots/                 # matplotlib scripts
-├── notes/                     # investigation notes, blockers, retries
-│   └── trt_edgellm_cosmos_blocker.md
+├── notes/                     # investigation writeups
+│   └── trt_edgellm_cosmos_resolution.md
 ├── assets/                    # inputs + outputs
 │   ├── images/ videos/        # test inputs
 │   └── results/               # raw JSON, memory snapshots, CSV
