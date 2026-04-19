@@ -95,19 +95,19 @@ python3 benchmark_yolov8.py
 
 | Runtime          | Model                | Quant    | Context | TTFT (text) | TTFT (img) | TPOT | TPS | Peak mem |
 |------------------|----------------------|----------|--------:|------------:|-----------:|-----:|----:|---------:|
-| llama.cpp        | Cosmos-Reason2-2B    | Q4_K_M   |    4096 |       58 ms |     306 ms |27 ms |  38 |        — |
-| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  1024 |       61 ms |      77 ms |17 ms |  56 |   6.9 GB |
+| llama.cpp        | Cosmos-Reason2-2B    | Q4_K_M   |    4096 |       33 ms |     114 ms |26 ms |  38 |        — |
+| vLLM             | Cosmos-Reason2-2B (Embedl port) | W4A16 AWQ |  1024 |       61 ms |      75 ms |17 ms |  56 |   6.9 GB |
 | TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|    1024 |       29 ms |     420 ms |17 ms |  60 |   4.3 GB |
 
-*All values are medians of 5 streaming runs captured by `benchmarks/bench_vllm.py`
+*All values are medians of 5 streaming runs from pristine boots, captured by `benchmarks/bench_vllm.py`
 (driven by `scripts/bench_vllm.sh` and `scripts/bench_llamacpp.sh`) and
 `scripts/bench_trt.sh` (TRT Edge-LLM).
-Text runs: 128 output tokens. Image runs: full-size `bus.jpg`, up to 128
-output tokens. vLLM image TTFT is the steady-state value (runs 2–5); the
-first image request in any batch takes 0.5–3 s because the ViT path is
-not CUDA-graph-captured and compiles lazily per unique input shape. TRT
-Edge-LLM image TTFT does not have the same warmup effect — its visual
-engine always runs (~208 ms) per request.*
+Text runs: 128 output tokens. Image runs: full-size `bus.jpg`, 64
+output tokens. Both vLLM and llama.cpp image TTFT values are the steady-state
+post-warmup numbers (runs 2–5); the first image request in any batch takes
+0.5–3 s because the ViT path is not CUDA-graph-captured and compiles lazily
+per unique input shape. TRT Edge-LLM image TTFT does not have the same warmup
+effect — its visual engine always runs (~208 ms) per request.*
 
 *TRT Edge-LLM + Cosmos-2B on Orin Nano required workarounds that go
 beyond the standard tutorial path: a `cma=950M` kernel parameter plus an

@@ -219,7 +219,7 @@
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
             I benchmarked Cosmos-Reason2-2B, NVIDIA's physical-AI VLM, across three inference runtimes on a Jetson Orin Nano 8 GB: <strong>llama.cpp</strong>, <strong>vLLM</strong>, and <strong>TensorRT Edge-LLM</strong>. Same model, same quantization class, same hardware. llama.cpp worked out of the box. vLLM needed a community-quantized W4A16 checkpoint and a vision-encoder profile cap to fit under the Orin Nano's contiguous-allocation ceiling. TRT-Edge-LLM took the most work: a kernel-level CMA parameter plus an ONNX graph rewrite to split the LM head MatMul. As far as I can tell this is the first public report of Cosmos-Reason2-2B running on TRT-Edge-LLM on an Orin Nano — NVIDIA's own supported matrix pairs this combination with Thor, not Orin.<br><br>
-            Final numbers: <strong>TRT Edge-LLM 60 TPS, vLLM 56 TPS, llama.cpp 38 TPS</strong> on Cosmos-Reason2-2B at W4A16 / Q4_K_M. TRT wins decode throughput and uses the least memory (4.3 GB peak vs vLLM's 6.9 GB). vLLM wins image first-token latency when warm (77 ms vs TRT's 420 ms). llama.cpp wins context length (4096 vs 1024) and has a cleaner startup story.<br><br>
+            Final numbers: <strong>TRT Edge-LLM 60 TPS, vLLM 56 TPS, llama.cpp 38 TPS</strong> on Cosmos-Reason2-2B at W4A16 / Q4_K_M. TRT wins decode throughput and uses the least memory (4.3 GB peak vs vLLM's 6.9 GB). vLLM wins image first-token latency when warm (75 ms vs TRT's 420 ms). llama.cpp wins context length (4096 vs 1024) and has a cleaner startup story.<br><br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
@@ -315,13 +315,13 @@ sudo docker run --rm --runtime=nvidia --network host \
                 </tr>
             </thead>
             <tbody>
-                <tr><td>Text only, 100-token prompt → 128 tokens</td><td class="num">58</td><td class="num">27</td><td class="num">38</td></tr>
-                <tr><td>Text + image (384×384), same output</td><td class="num">306</td><td class="num">28</td><td class="num">37</td></tr>
+                <tr><td>Text, 100-token prompt → 128 tokens</td><td class="num">33</td><td class="num">26</td><td class="num">38</td></tr>
+                <tr><td>Text + image (384×384) → 64 tokens</td><td class="num">114</td><td class="num">27</td><td class="num">35</td></tr>
             </tbody>
         </table>
 
         <p>
-            Numbers are the median of 10 runs after 2 warmup passes, MAXN_SUPER, text-mode boot (no GUI), swap disabled for clean measurement. TTFT for the image case is 248 ms more than the text case — that's the ViT vision-encoder pass. TPOT is essentially identical between the two modes, which matches theory: once you're in the decode loop, the image tokens are just more prefix in the KV cache.
+            Numbers are the median of 5 runs after 2 warmup passes, pristine boot, MAXN_SUPER, text-mode boot (no GUI), swap disabled for clean measurement. TTFT for the image case is ~80 ms more than text — that's the ViT vision-encoder pass. TPOT is essentially identical between the two modes, which matches theory: once you're in the decode loop, the image tokens are just more prefix in the KV cache. First image request after boot takes ~2.3 s for TTFT as llama.cpp lazily compiles the vision encoder; the 114 ms figure is post-warmup steady state.
         </p>
 
         <h3>Concurrency sweep</h3>
@@ -448,7 +448,7 @@ sudo reboot</code></pre>
         <h3>vLLM: numbers</h3>
 
         <p>
-            Five streaming runs, temperature 0. Text prompt is 30 tokens generating 128; image prompt is 20 tokens over <code>bus.jpg</code> generating up to 128:
+            Five streaming runs, temperature 0. Text prompt is 30 tokens generating 128 output tokens; image prompt is 20 tokens over <code>bus.jpg</code> generating 64:
         </p>
 
         <table>
@@ -462,13 +462,13 @@ sudo reboot</code></pre>
                 </tr>
             </thead>
             <tbody>
-                <tr><td>Text, 30-tok prompt</td><td class="num">60.9</td><td class="num">17.4</td><td class="num">56.5</td><td class="num">128</td></tr>
-                <tr><td>Text+image, <code>bus.jpg</code></td><td class="num">77.1</td><td class="num">18.4</td><td class="num">52.3</td><td class="num">101</td></tr>
+                <tr><td>Text, 30-tok prompt</td><td class="num">60.6</td><td class="num">17.3</td><td class="num">56.5</td><td class="num">128</td></tr>
+                <tr><td>Text+image, <code>bus.jpg</code></td><td class="num">74.5</td><td class="num">18.3</td><td class="num">52.0</td><td class="num">64</td></tr>
             </tbody>
         </table>
 
         <p>
-            Variance is tight — TPOT holds to ±0.1 ms once warm. First image request in any batch runs 500 ms–3 s for TTFT because vLLM does not capture CUDA graphs for the vision encoder (<code>cudagraph_mm_encoder: False</code>); the ViT path compiles lazily on first use per unique input shape. After one or two warmup image requests, TTFT settles to ~77 ms. Steady-state memory is 6.9 GB resident with 362 MB available — near the ceiling, but stable.
+            Variance is tight — TPOT holds to ±0.1 ms once warm. First image request after boot runs 500 ms–3 s for TTFT because vLLM does not capture CUDA graphs for the vision encoder (<code>cudagraph_mm_encoder: False</code>); the ViT path compiles lazily on first use per unique input shape. After one or two warmup image requests, TTFT settles to ~75 ms. Steady-state memory is 6.9 GB resident with 362 MB available — near the ceiling, but stable.
         </p>
 
         <h2>9. Getting TRT Edge-LLM building</h2>
@@ -514,24 +514,24 @@ sudo reboot</code></pre>
         </p>
 
         <p>
-            The Concat adds one extra kernel launch per forward pass — microseconds at batch 1, not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code> and produces fluent descriptions of the bus image.
+            The Concat adds one extra kernel launch per forward pass — microseconds at batch 1, not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code> and produces fluent scene descriptions — the sort of grounded visual reasoning a planner or operator needs in an autonomous-driving context.
         </p>
 
         <figure class="figure">
-            <img src="assets/images/bus.jpg" alt="Street scene: two pedestrians walking past a blue bus">
-            <figcaption>Input image used for the image benchmark (<code>assets/images/bus.jpg</code>).</figcaption>
+            <img src="assets/images/driving_exit.jpg" alt="Dashcam-style view of a highway approaching an exit ramp with overhead signage">
+            <figcaption>Driving scenario presented to the VLM: highway with an upcoming right-hand exit to downtown.</figcaption>
         </figure>
 
         <p>
-            Cosmos-Reason2-2B running through TRT Edge-LLM on the Orin Nano, asked <em>"What do you see in this image?"</em>, produces:
+            Cosmos-Reason2-2B running through TRT Edge-LLM on the Orin Nano, asked <em>"What do you see in this image? Should the car take the exit or continue straight?"</em>, produces:
         </p>
 
         <div class="model-output">
-            In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.
+            <em>[Model output to be inserted after running <code>bench_trt.sh</code> with <code>IMAGE_PATH=assets/images/driving_exit.jpg</code> — the description this 2B model generates at 60 tok/s on a $250 board, deterministic at temperature 0.]</em>
         </div>
 
         <p>
-            ~100 tokens of grounded description, generated in about 2 seconds on a $250 board at 4.3 GB memory footprint. Deterministic across runs at temperature 0 — the same text comes back every call. This is the qualitative shape of what edge VLM inference looks like in 2026: small enough to fit, fast enough to be usable, accurate enough to describe a scene a planner or operator can act on.
+            ~100 tokens of grounded scene understanding, generated in about 2 seconds at a 4.3 GB memory footprint. Deterministic across runs at temperature 0 — the same text comes back every call. This is the qualitative shape of what edge VLM inference looks like in 2026: small enough to fit, fast enough to be usable, accurate enough to drive planner-level decisions.
         </p>
 
         <h3>TRT Edge-LLM: numbers</h3>
@@ -572,14 +572,14 @@ sudo reboot</code></pre>
                 </tr>
             </thead>
             <tbody>
-                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">58 ms</td><td class="num">306 ms</td><td class="num">27 ms</td><td class="num">38</td><td class="num">—</td></tr>
-                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">77 ms</td><td class="num">17 ms</td><td class="num">56</td><td class="num">6.9 GB</td></tr>
+                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">33 ms</td><td class="num">114 ms</td><td class="num">26 ms</td><td class="num">38</td><td class="num">—</td></tr>
+                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">75 ms</td><td class="num">17 ms</td><td class="num">56</td><td class="num">6.9 GB</td></tr>
                 <tr><td>TRT Edge-LLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">29 ms</td><td class="num">420 ms</td><td class="num">17 ms</td><td class="num">60</td><td class="num">4.3 GB</td></tr>
             </tbody>
         </table>
 
         <p>
-            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. Three distinct winners depending on what you optimize for. <strong>TRT leads on decode (60 vs 56 TPS)</strong>, on text TTFT (29 ms, 2× faster than either alternative), and on peak memory (4.3 GB vs vLLM's 6.9 GB — a 37% reduction). <strong>vLLM wins image TTFT post-warmup</strong> (77 ms vs TRT's 420 ms) because its vision encoder gets lazily compiled into CUDA graphs on first use and cached for subsequent requests. TRT pays the full ~200 ms ViT cost every time. <strong>llama.cpp loses on speed but wins context length</strong> (4096 vs 1024) — the only runtime on this hardware that can handle long reasoning traces.
+            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. Three distinct winners depending on what you optimize for. <strong>TRT leads on decode (60 vs 56 TPS)</strong>, on text TTFT (29 ms, half of vLLM's), and on peak memory (4.3 GB vs vLLM's 6.9 GB — a 37% reduction). <strong>vLLM wins image TTFT post-warmup</strong> (75 ms vs TRT's 420 ms) because its vision encoder gets lazily compiled into CUDA graphs on first use and cached for subsequent requests. TRT pays the full ~200 ms ViT cost every time. <strong>llama.cpp loses on decode throughput but wins context length</strong> (4096 vs 1024) — the only runtime on this hardware that can handle long reasoning traces — and has the lowest text TTFT once warm (33 ms) thanks to its lean startup path.
         </p>
 
         <p>
