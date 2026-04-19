@@ -151,7 +151,7 @@ sudo reboot
 
 | Phase | Where     | What                                                           | Status |
 |-------|-----------|----------------------------------------------------------------|--------|
-| 0     | Host      | AWQ quantize + ONNX export for TRT-Edge-LLM (on A40 pod, ~30 min). See `host/README.md`. | ✅ |
+| 0     | Host      | AWQ quantize + ONNX export for TRT-Edge-LLM (on A40 pod, ~30 min). Done on ephemeral pod; artifacts scp'd to Jetson. | ✅ |
 | 1a    | Orin Nano | Verify JetPack ≥ 6.2.2 (L4T ≥ 36.5.0). Upgrade via apt if on 6.2.1. See `device/README.md`. | ✅ |
 | 1b    | Orin Nano | Build TRT-Edge-LLM C++ runtime + plugin library. | ✅ |
 | 1c    | Orin Nano | Download Cosmos-Reason2-2B GGUF, merge splits, quantize to Q4_K_M. | ✅ |
@@ -201,37 +201,37 @@ TRT-Edge-LLM `llm_inference` CLI directly since it isn't an HTTP server.
 vlm-benchmarks/
 ├── README.md                  # this file
 ├── index.html                 # blog post
-├── host/                      # Phase 0 — x86/A40 host
-│   ├── scripts/               # setup, quantize, export, package
-│   └── calibration/           # shared calibration set
-├── device/                    # Phase 1-2 — Jetson setup
+├── device/                    # Jetson setup
 │   ├── README.md              # JetPack upgrade + hardware setup
 │   ├── scripts/               # 03_* vLLM, 10_-11_* llama.cpp, 40_-41_* TRT
 │   ├── configs/               # per-runtime env files
 │   ├── inputs/trt/            # TRT benchmark prompt files
 │   └── trt_cosmos_patches/    # CMA recipe, split_lm_head.py, source patch
-├── benchmarks/                # Phase 2-3 — runtime-agnostic Python library
+├── benchmarks/                # runtime-agnostic Python library
 │   ├── harness.py             # orchestrator (tegrastats + power + latency)
 │   ├── bench_vllm.py          # streaming TTFT/TPOT benchmark client
 │   ├── clients/               # one thin client per runtime
 │   ├── metrics/               # latency, resource, power parsers
-│   ├── workloads/             # text / image / video prompt sets
-│   └── profiling/             # Nsight + roofline
+│   └── workloads/             # text / image / video prompt sets
 ├── scripts/                   # benchmark runners (cross-cutting)
 │   ├── bench_llamacpp.sh      # drives llama.cpp via OpenAI API
 │   ├── bench_vllm.sh          # drives vLLM via OpenAI API
 │   └── bench_trt.sh           # drives TRT-Edge-LLM llm_inference CLI
 ├── notes/                     # investigation writeups
 │   └── trt_edgellm_cosmos_resolution.md
-├── analysis/                  # Phase 4 — post-processing
-│   └── plots/                 # matplotlib scripts
 └── assets/                    # inputs + outputs
-    ├── images/ videos/        # test inputs
+    ├── images/                # test inputs
     └── results/               # per-runtime JSONs + logs
         ├── llamacpp/
         ├── vllm/
         └── trt/
 ```
+
+Planned but not yet materialised: a `host/` directory for the x86/A40
+quantization + ONNX export pipeline (Phase 0 was done on an ephemeral
+pod; the scripts will be committed when the host path is reproducible
+from cold), and an `analysis/` directory for Phase 4 plots and roofline
+analysis (including Nsight captures once Phase 3 lands).
 
 ## References
 

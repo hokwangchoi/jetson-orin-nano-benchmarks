@@ -130,7 +130,6 @@ for the patches and scripts.*
 └── vlm-benchmarks/              # complete
     ├── README.md                # story, methodology, phase plan
     ├── index.html               # blog post
-    ├── host/                    # x86 host — quantization + ONNX export
     ├── device/                  # Jetson — runtime setup + serving
     │   ├── README.md            # JetPack upgrade, hardware setup
     │   ├── scripts/             # 03_* vLLM, 10_-11_* llama.cpp, 40_-41_* TRT
@@ -142,7 +141,6 @@ for the patches and scripts.*
     │   └── bench_vllm.py        # streaming TTFT/TPOT benchmark
     ├── scripts/                 # benchmark runners (bench_vllm/llamacpp/trt.sh)
     ├── notes/                   # investigation writeups
-    ├── analysis/                # plots + final writeup
     └── assets/                  # inputs + outputs
         ├── images/              # test inputs
         └── results/             # per-runtime result JSONs
