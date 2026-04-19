@@ -51,7 +51,7 @@ Cosmos-2B to build on Orin Nano required three interventions:
 
 7. **Benchmark**:
    ```bash
-   vlm-benchmarks/device/scripts/42_bench_cosmos_trt.sh
+   vlm-benchmarks/scripts/bench_trt.sh
    ```
 
 ## Why 950M for CMA?
@@ -122,5 +122,5 @@ during build attempts.
 - TRT-Edge-LLM: (whatever main was on 2026-04-18)
 - ONNX tooling: onnx 1.21.0
 - The CMA trace logs, build logs, and profile JSONs from the actual runs
-  are preserved in `vlm-benchmarks/device/results/trt/` and cited in the
+  are preserved in `vlm-benchmarks/assets/results/trt/` and cited in the
   resolution notes.

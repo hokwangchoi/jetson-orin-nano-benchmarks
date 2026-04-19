@@ -10,10 +10,14 @@ Usage:
     python3 benchmarks/bench_vllm.py \
         --url http://localhost:8000 \
         --model embedl/Cosmos-Reason2-2B-W4A16 \
-        --image assets/images/crossing.jpg   # optional
+        --image assets/images/bus.jpg   # optional
 
     # Text-only quick pass:
     python3 benchmarks/bench_vllm.py --text-only
+
+Output defaults to assets/results/; the shell wrappers in scripts/
+(bench_vllm.sh, bench_llamacpp.sh) pass an explicit --output path per
+runtime so the results land in assets/results/<runtime>/.
 
 See benchmarks/harness.py for the full runtime-agnostic harness (drives
 llama.cpp, vLLM, and TRT-Edge-LLM through a common OpenAI interface,

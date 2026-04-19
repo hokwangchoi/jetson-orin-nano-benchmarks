@@ -38,8 +38,8 @@ Total TTFT for text-only prompts = `stages.llm_prefill.median_ms` alone
 All of these were produced by running:
 
 ```bash
-./scripts/42_bench_cosmos_trt.sh
+./scripts/bench_trt.sh
 ```
 
-from the `vlm-benchmarks/device/` directory after the engines were built
-with `40_build_cosmos_trt_engines.sh`.
+from the `vlm-benchmarks/` directory after the engines were built
+with `./device/scripts/40_build_cosmos_trt_engines.sh`.

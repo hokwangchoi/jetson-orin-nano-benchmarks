@@ -100,8 +100,11 @@ recipe is in
 [`trt_cosmos_patches/README.md`](./trt_cosmos_patches/README.md);
 the investigation writeup is in
 [`../notes/trt_edgellm_cosmos_resolution.md`](../notes/trt_edgellm_cosmos_resolution.md).
-Build and benchmark with `./scripts/40_build_cosmos_trt_engines.sh`,
-`./scripts/41_sanity_cosmos_trt.sh`, and `./scripts/42_bench_cosmos_trt.sh`.
+Build the engines with `./scripts/40_build_cosmos_trt_engines.sh`
+and sanity-check with `./scripts/41_sanity_cosmos_trt.sh` (both here
+in `device/scripts/`). Then run the actual benchmark with
+`../scripts/bench_trt.sh` (from `vlm-benchmarks/scripts/`, alongside
+the vLLM and llama.cpp wrappers).
 
 ## Profiling gotchas
 

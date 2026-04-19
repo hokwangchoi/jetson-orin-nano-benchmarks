@@ -572,22 +572,21 @@ cat device/README.md  # L4T upgrade section
 # llama.cpp path (works out of the box on 6.2.2)
 ./device/scripts/10_prepare_llamacpp.sh      # download + quantize (~15 min)
 ./device/scripts/11_run_llamacpp_server.sh   # serves on :8000
+./scripts/bench_llamacpp.sh                  # 5-run TTFT/TPOT/TPS
 
 # vLLM path (works on 6.2.2 with W4A16 model + vision-encoder profile cap)
 ./device/scripts/03_run_vllm_server.sh       # serves on :8000
-
-# Streaming benchmark against vLLM (or llama.cpp — same OpenAI API)
-python3 benchmarks/bench_vllm.py --model embedl/Cosmos-Reason2-2B-W4A16
+./scripts/bench_vllm.sh                      # 5-run TTFT/TPOT/TPS
 
 # TRT Edge-LLM path (requires the workarounds from §9)
 cat device/trt_cosmos_patches/README.md             # CMA config, ONNX surgery
 python3 device/trt_cosmos_patches/split_lm_head.py  # one-time graph rewrite
 ./device/scripts/40_build_cosmos_trt_engines.sh     # build LLM + visual engines
 ./device/scripts/41_sanity_cosmos_trt.sh            # verify output correctness
-./device/scripts/42_bench_cosmos_trt.sh             # 5-run TTFT/TPOT/TPS</code></pre>
+./scripts/bench_trt.sh                              # 5-run TTFT/TPOT/TPS</code></pre>
 
         <p>
-            Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, CMA traces, and methodology notes are all in <code>vlm-benchmarks/device/results/</code> and <code>vlm-benchmarks/assets/results/</code>. Investigation writeups for the TRT workaround are in <code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code>.
+            Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, CMA traces, and methodology notes are all in <code>vlm-benchmarks/assets/results/</code>. Investigation writeups for the TRT workaround are in <code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code>.
         </p>
 
         <h2>12. For the robotics and autonomous-driving engineers reading this</h2>

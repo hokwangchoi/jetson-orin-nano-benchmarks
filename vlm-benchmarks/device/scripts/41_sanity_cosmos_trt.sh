@@ -3,7 +3,7 @@
 #
 # Runs two single-prompt inferences (one text, one image). Purpose is to
 # confirm that after all the graph surgery the engine isn't producing
-# gibberish. Not a benchmark; use 42_bench_cosmos_trt.sh for numbers.
+# gibberish. Not a benchmark; use scripts/bench_trt.sh for numbers.
 #
 # Expected: the text prompt returns a plausible answer ("Paris" for
 # "capital of France"), and the image prompt describes the bus scene.
@@ -56,4 +56,4 @@ echo "Text response:   /tmp/trt_sanity_text_out.json"
 echo "Image response:  /tmp/trt_sanity_image_out.json"
 echo ""
 echo "Eyeball both outputs for coherence. If they look sane, proceed to"
-echo "42_bench_cosmos_trt.sh for timing measurements."
+echo "scripts/bench_trt.sh (from the repo root) for timing measurements."

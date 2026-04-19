@@ -100,7 +100,8 @@ python3 benchmark_yolov8.py
 | TRT Edge-LLM     | Cosmos-Reason2-2B    | W4A16 AWQ|    1024 |       29 ms |     420 ms |17 ms |  60 |   4.3 GB |
 
 *All values are medians of 5 streaming runs captured by `benchmarks/bench_vllm.py`
-(llama.cpp and vLLM) and `device/scripts/42_bench_cosmos_trt.sh` (TRT Edge-LLM).
+(driven by `scripts/bench_vllm.sh` and `scripts/bench_llamacpp.sh`) and
+`scripts/bench_trt.sh` (TRT Edge-LLM).
 Text runs: 128 output tokens. Image runs: full-size `bus.jpg`, up to 128
 output tokens. vLLM image TTFT is the steady-state value (runs 2–5); the
 first image request in any batch takes 0.5–3 s because the ViT path is
@@ -126,22 +127,28 @@ for the patches and scripts.*
 │   ├── assets/                  # figures, results
 │   └── scripts/
 │       └── benchmark_yolov8.py
-└── vlm-benchmarks/              # in progress
+└── vlm-benchmarks/              # complete
     ├── README.md                # story, methodology, phase plan
     ├── index.html               # blog post
     ├── host/                    # x86 host — quantization + ONNX export
-    ├── device/                  # Jetson — runtime build + serving
+    ├── device/                  # Jetson — runtime setup + serving
     │   ├── README.md            # JetPack upgrade, hardware setup
-    │   ├── scripts/             # 03_* vLLM, 10_* / 11_* llama.cpp
-    │   └── configs/             # per-runtime env files
-    ├── benchmarks/              # runtime-agnostic harness + streaming bench
+    │   ├── scripts/             # 03_* vLLM, 10_-11_* llama.cpp, 40_-41_* TRT
+    │   ├── configs/             # per-runtime env files
+    │   ├── inputs/trt/          # TRT-specific benchmark prompts
+    │   └── trt_cosmos_patches/  # CMA recipe, split_lm_head.py, source patch
+    ├── benchmarks/              # runtime-agnostic Python library
     │   ├── harness.py           # full orchestrator (tegrastats, power, latency)
     │   └── bench_vllm.py        # streaming TTFT/TPOT benchmark
+    ├── scripts/                 # benchmark runners (bench_vllm/llamacpp/trt.sh)
     ├── notes/                   # investigation writeups
     ├── analysis/                # plots + final writeup
-    ├── assets/                  # inputs, results, profiles
-    │   └── results/             # raw JSON results, memory snapshots
-    └── scripts/                 # v1 placeholder (superseded by benchmarks/)
+    └── assets/                  # inputs + outputs
+        ├── images/              # test inputs
+        └── results/             # per-runtime result JSONs
+            ├── llamacpp/
+            ├── vllm/
+            └── trt/
 ```
 
 ## License

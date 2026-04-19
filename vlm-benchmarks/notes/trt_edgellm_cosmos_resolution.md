@@ -176,8 +176,8 @@ worse with batch size, so the split likely remains the faster path.
   documentary source patch
 - `device/scripts/40_build_cosmos_trt_engines.sh` — end-to-end build
 - `device/scripts/41_sanity_cosmos_trt.sh` — post-build correctness check
-- `device/scripts/42_bench_cosmos_trt.sh` — benchmark runner
-- `device/results/trt/` — profile JSONs and logs
+- `scripts/bench_trt.sh` — benchmark runner
+- `assets/results/trt/` — profile JSONs and logs
 - NVIDIA forum thread on related NvMap issues:
   <https://forums.developer.nvidia.com/t/unable-to-allocate-cuda0-buffer-after-updating-ubuntu-packages/347862>
 - JetPack 6.2.2 release:

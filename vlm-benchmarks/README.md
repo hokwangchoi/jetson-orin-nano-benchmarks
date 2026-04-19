@@ -170,22 +170,30 @@ idempotent and checks for existing outputs before re-running.
 ```bash
 cd vlm-benchmarks
 cat device/README.md                     # JetPack upgrade, MAXN_SUPER, swap
-cat device/scripts/10_prepare_llamacpp.sh
-cat device/scripts/11_run_llamacpp_server.sh
-cat device/scripts/03_run_vllm_server.sh
 
-# TRT Edge-LLM path (requires the CMA + ONNX surgery workarounds)
-cat device/trt_cosmos_patches/README.md  # operator-facing recipe
-cat notes/trt_edgellm_cosmos_resolution.md  # full investigation narrative
-python3 device/trt_cosmos_patches/split_lm_head.py  # one-time graph rewrite
-./device/scripts/40_build_cosmos_trt_engines.sh     # build LLM + visual engines
-./device/scripts/41_sanity_cosmos_trt.sh            # verify correct outputs
-./device/scripts/42_bench_cosmos_trt.sh             # 5-run TTFT/TPOT/TPS
+# llama.cpp
+cat device/scripts/10_prepare_llamacpp.sh   # one-time download + quantize
+./device/scripts/11_run_llamacpp_server.sh  # serve on :8000
+./scripts/bench_llamacpp.sh                 # 5-run TTFT/TPOT/TPS
 
-# Streaming benchmark against any OpenAI-compatible endpoint (llama.cpp or vLLM):
-python3 benchmarks/bench_vllm.py --url http://localhost:8000 \
-    --model embedl/Cosmos-Reason2-2B-W4A16
+# vLLM
+./device/scripts/03_run_vllm_server.sh      # serve on :8000
+./scripts/bench_vllm.sh                     # 5-run TTFT/TPOT/TPS
+
+# TRT Edge-LLM (requires the CMA + ONNX surgery workarounds)
+cat device/trt_cosmos_patches/README.md                 # operator-facing recipe
+cat notes/trt_edgellm_cosmos_resolution.md              # full investigation
+python3 device/trt_cosmos_patches/split_lm_head.py      # one-time graph rewrite
+./device/scripts/40_build_cosmos_trt_engines.sh         # build LLM + visual engines
+./device/scripts/41_sanity_cosmos_trt.sh                # verify correct outputs
+./scripts/bench_trt.sh                                  # 5-run TTFT/TPOT/TPS
 ```
+
+The benchmark wrappers in `scripts/` all write JSONs to
+`assets/results/<runtime>/`. For vLLM and llama.cpp, both wrappers call
+`benchmarks/bench_vllm.py` under the hood (the two servers expose the
+same OpenAI-compatible API); `scripts/bench_trt.sh` drives the
+TRT-Edge-LLM `llm_inference` CLI directly since it isn't an HTTP server.
 
 ## Repository layout
 
@@ -196,28 +204,33 @@ vlm-benchmarks/
 ├── host/                      # Phase 0 — x86/A40 host
 │   ├── scripts/               # setup, quantize, export, package
 │   └── calibration/           # shared calibration set
-├── device/                    # Phase 1-2 — Jetson
+├── device/                    # Phase 1-2 — Jetson setup
 │   ├── README.md              # JetPack upgrade + hardware setup
-│   ├── scripts/               # 03_* vLLM, 10_*/11_* llama.cpp, 40_-42_* TRT
-│   ├── configs/               # per-runtime parameters
+│   ├── scripts/               # 03_* vLLM, 10_-11_* llama.cpp, 40_-41_* TRT
+│   ├── configs/               # per-runtime env files
 │   ├── inputs/trt/            # TRT benchmark prompt files
-│   ├── results/trt/           # TRT per-run timing JSONs, logs
 │   └── trt_cosmos_patches/    # CMA recipe, split_lm_head.py, source patch
-├── benchmarks/                # Phase 2-3 — runtime-agnostic harness
+├── benchmarks/                # Phase 2-3 — runtime-agnostic Python library
 │   ├── harness.py             # orchestrator (tegrastats + power + latency)
-│   ├── bench_vllm.py          # streaming TTFT/TPOT benchmark
+│   ├── bench_vllm.py          # streaming TTFT/TPOT benchmark client
 │   ├── clients/               # one thin client per runtime
 │   ├── metrics/               # latency, resource, power parsers
 │   ├── workloads/             # text / image / video prompt sets
 │   └── profiling/             # Nsight + roofline
-├── analysis/                  # Phase 4 — post-processing
-│   └── plots/                 # matplotlib scripts
+├── scripts/                   # benchmark runners (cross-cutting)
+│   ├── bench_llamacpp.sh      # drives llama.cpp via OpenAI API
+│   ├── bench_vllm.sh          # drives vLLM via OpenAI API
+│   └── bench_trt.sh           # drives TRT-Edge-LLM llm_inference CLI
 ├── notes/                     # investigation writeups
 │   └── trt_edgellm_cosmos_resolution.md
-├── assets/                    # inputs + outputs
-│   ├── images/ videos/        # test inputs
-│   └── results/               # raw JSON, memory snapshots, CSV
-└── scripts/                   # v1 placeholder (kept as historical reference)
+├── analysis/                  # Phase 4 — post-processing
+│   └── plots/                 # matplotlib scripts
+└── assets/                    # inputs + outputs
+    ├── images/ videos/        # test inputs
+    └── results/               # per-runtime JSONs + logs
+        ├── llamacpp/
+        ├── vllm/
+        └── trt/
 ```
 
 ## References

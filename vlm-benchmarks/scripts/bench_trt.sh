@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# 42_bench_cosmos_trt.sh — run the 5-iteration text and image benchmarks.
+# bench_trt.sh — run the 5-iteration text and image TRT-Edge-LLM benchmarks.
+#
+# Prerequisite: 40_build_cosmos_trt_engines.sh has been run and
+# $WORKSPACE/$MODEL_NAME/engine-1024/llm/llm.engine exists.
 #
 # Produces profile JSONs compatible with the aggregation downstream. Uses
 # --warmup 2 to match the post-warmup regime measured for llama.cpp and vLLM.
 #
-# Output JSONs land under vlm-benchmarks/device/results/trt/ with a timestamp
+# Output JSONs land under vlm-benchmarks/assets/results/trt/ with a timestamp
 # suffix so multiple runs can be kept.
 
 set -euo pipefail
@@ -13,8 +16,9 @@ WORKSPACE="${WORKSPACE:-$HOME/tensorrt-edgellm-workspace}"
 MODEL_NAME="${MODEL_NAME:-Cosmos-Reason2-2B-split}"
 EDGELLM_ROOT="${EDGELLM_ROOT:-$HOME/TensorRT-Edge-LLM}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INPUT_DIR="$SCRIPT_DIR/../inputs/trt"
-RESULTS_DIR="$SCRIPT_DIR/../results/trt"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+INPUT_DIR="${REPO_ROOT}/device/inputs/trt"
+RESULTS_DIR="${REPO_ROOT}/assets/results/trt"
 
 export EDGELLM_PLUGIN_PATH="$EDGELLM_ROOT/build/libNvInfer_edgellm_plugin.so"
 
