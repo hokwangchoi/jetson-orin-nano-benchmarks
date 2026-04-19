@@ -41,15 +41,15 @@ runtimes. Same model (Cosmos-Reason2-2B), same quantization class
 - **Model**: Cosmos-Reason2-2B (Qwen3-VL-2B post-trained for physical reasoning)
 - **Runtimes**: llama.cpp (ggml C runtime) vs vLLM (PyTorch + PagedAttention)
   vs TensorRT Edge-LLM (C++, fused TRT kernels)
-- **What happened**: JetPack 6.2.1 shipped with an NvMap memory-allocation
-  bug that blocked vLLM and TRT-Edge-LLM in different ways. NVIDIA
-  released a partial fix (JetPack 6.2.2). vLLM now works with a
-  community-quantized W4A16 checkpoint (Embedl) plus a vision-encoder
-  profile cap that keeps startup allocations under the Orin Nano's
-  NvMap limit. TRT-Edge-LLM was the harder of the two — required a
-  kernel-level CMA change plus an ONNX graph rewrite (splitting the LM
-  head MatMul) to get past Myelin's 1 GiB tactic scratch request. As
-  far as I can tell this is the first public report of Cosmos-Reason2-2B
+- **What happened**: JetPack 6.2.1 shipped with a tightened NvMap
+  contiguous-allocation ceiling that blocked vLLM and TRT-Edge-LLM in
+  different ways. JetPack 6.2.2 relaxed the PyTorch initialization
+  path. vLLM now works with a community-quantized W4A16 checkpoint
+  (Embedl) plus a vision-encoder profile cap that keeps startup
+  allocations under the ceiling. TRT-Edge-LLM took more: a kernel-level
+  CMA parameter plus an ONNX graph rewrite (splitting the LM head
+  MatMul) to get past Myelin's 1 GiB tactic scratch request. As far as
+  I can tell this is the first public report of Cosmos-Reason2-2B
   running on TRT-Edge-LLM on an Orin Nano.
 - **Metrics**: TTFT, TPOT, TPS, peak/steady-state memory
 - **Angle**: robotics and AV perception workloads — what does it
@@ -137,7 +137,7 @@ for the patches and scripts.*
     ├── benchmarks/              # runtime-agnostic harness + streaming bench
     │   ├── harness.py           # full orchestrator (tegrastats, power, latency)
     │   └── bench_vllm.py        # streaming TTFT/TPOT benchmark
-    ├── notes/                   # investigation writeups (blockers, retries)
+    ├── notes/                   # investigation writeups
     ├── analysis/                # plots + final writeup
     ├── assets/                  # inputs, results, profiles
     │   └── results/             # raw JSON results, memory snapshots

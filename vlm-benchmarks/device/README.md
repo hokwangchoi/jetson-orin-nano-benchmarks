@@ -6,8 +6,9 @@ Everything in this folder runs **on the Jetson Orin Nano 8 GB**.
 
 - **JetPack 6.2.2 (L4T 36.5.0) or later.** If you're on 6.2.1
   (L4T 36.4.7), upgrade first — see [JetPack upgrade](#jetpack-upgrade)
-  below. Running on 6.2.1 will block vLLM with an NvMap memory-allocation
-  bug and break TRT Edge-LLM engine builds.
+  below. On 6.2.1, vLLM fails to start (PyTorch CUDA allocator asserts
+  during NVML sanity check) and TRT Edge-LLM engine builds fail at the
+  LM head Myelin tactic selection.
 - CUDA 12.6, TensorRT 10.3 — included with JetPack 6.2.x.
 - MAXN_SUPER power mode and pinned clocks:
   ```bash

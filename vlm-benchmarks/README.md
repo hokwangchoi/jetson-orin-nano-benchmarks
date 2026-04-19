@@ -78,26 +78,27 @@ hackable local runtime. vLLM is the production serving engine with
 PagedAttention and continuous batching. TRT Edge-LLM is the embedded,
 single-app C++ runtime for automotive and robotics.
 
-## The L4T 36.4.7 blocker
+## The L4T 36.4.7 contiguous-allocation ceiling
 
-Halfway into the work, I hit an NvMap memory-allocation bug in
-JetPack 6.2.1 (L4T 36.4.7) that blocks CUDA workloads asking for large
-contiguous allocations — see the blog post for the full forensics.
+Halfway into the work, I hit a tightened NvMap contiguous-allocation
+ceiling on JetPack 6.2.1 (L4T 36.4.7) that affects CUDA workloads
+asking for large contiguous allocations — see the blog post for the
+full forensics.
 
-**The same bug surfaces differently on each runtime:**
+**The ceiling surfaces differently on each runtime:**
 
 - **llama.cpp** — unaffected. Its small-chunk allocation pattern
   sidesteps the problem entirely.
 - **vLLM** — PyTorch's CUDA caching allocator asserts on an NVML
   sanity check. Process dies on startup in 6.2.1; in 6.2.2 a variant
-  still triggers if you load the raw BF16 model (hits the bug during
+  still triggers if you load the raw BF16 model (hits the ceiling during
   multimodal profiling).
 - **TRT Edge-LLM** — the Myelin autotuner's 1 GB scratch-buffer request
   during engine build gets rejected, with the exact error signature
   `NvMapMemAllocInternalTagged: 1075072515 error 12`. Node turned out
   to be the LM head output projection (vocab=151936), not RoPE as
-  initially diagnosed. Not fixed by 6.2.2 — required a separate
-  workaround (see resolution notes).
+  initially diagnosed. Requires a separate workaround (see resolution
+  notes).
 
 JetPack 6.2.2 / L4T 36.5.0 resolves the startup-level path. vLLM now
 serves Cosmos-2B if you use a pre-quantized W4A16 checkpoint and cap
