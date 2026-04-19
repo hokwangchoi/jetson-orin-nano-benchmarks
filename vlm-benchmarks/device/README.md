@@ -76,6 +76,71 @@ Turn swap **off** during memory benchmarks to get clean peak-memory
 numbers (`sudo swapoff -a`), and **on** during production runs as a
 safety net for peak transients.
 
+## Pre-benchmark hygiene routine
+
+Run this before every benchmarking session. It establishes a known-clean
+state so numbers are comparable across runs and across runtimes. Takes
+~90 seconds total including the reboot.
+
+```bash
+# 1. Reboot to drop all lingering allocator state, NvMap mappings,
+#    CUDA graph caches, and thermal history
+sudo reboot
+```
+
+After the Jetson comes back up (~60s), re-SSH and run the verification
+block in one paste:
+
+```bash
+cat /proc/meminfo | grep Cma && \
+systemctl get-default && \
+sudo nvpmodel -m 2 && \
+sudo jetson_clocks ; \
+sudo swapoff -a && \
+sudo sysctl -w vm.drop_caches=3 && \
+free -h
+```
+
+Expected output:
+
+| Line | Expected value | Why it matters |
+|---|---|---|
+| `CmaTotal:` | `983040 kB` | 950M CMA kernel param took effect; TRT engine build needs this (see §9 in the blog). Affects vLLM startup too. |
+| `CmaFree:` | ~940000 kB | Pool is unreserved on fresh boot. If <500M, something is already holding CMA pages — reboot didn't finish cleanly. |
+| — | `multi-user.target` | Text-mode boot; ~100-200 MB of GPU memory saved vs. graphical.target. |
+| `NV Power Mode:` | `MAXN_SUPER` | `nvpmodel -m 2` set the ~67 TOPS mode. Default is `15W` which caps clocks at 60% of super. |
+| `Swap:` | `0B 0B 0B` | Clean memory measurement. zram is still mounted but empty after reboot + swapoff. |
+| `Mem: available` | ~6.8 Gi of 7.4 Gi total | Confirms the CMA reservation is accounted for (8GB physical − 950M CMA − ~100MB kernel ≈ 7.4 Gi reported). |
+
+If any line diverges from expected — especially `CmaTotal` not at 983040
+or `MAXN_SUPER` not showing — stop and fix before running the benchmark.
+Divergent state produces misleading numbers that look like runtime
+differences but are actually hygiene problems.
+
+### Why the routine matters even on a "fine-looking" boot
+
+On Tegra's unified memory, several kinds of leftover state can survive
+across benchmark runs without survivng a reboot:
+
+- **NvMap mappings from a crashed previous run** — `docker rm -f` doesn't
+  fully reclaim them; they show as reduced CUDA-available memory without
+  appearing in `free -h`.
+- **CMA fragmentation** — once the pool has been chewed by a failed
+  Myelin tactic search, large contiguous allocations may fail even after
+  the pool "appears" to have space. Only a reboot compacts it.
+- **Thermal hysteresis** — MAXN_SUPER lets the SoC boost clocks, but
+  after a heavy workload the thermal headroom is smaller. Benchmarks
+  right after a big engine build run measurably slower than same
+  benchmarks 5 minutes later or after a reboot.
+- **zram page cache staleness** — `vm.drop_caches=3` handles the kernel
+  page cache, but zram's compressed pages can stay mapped. `swapoff -a`
+  forces them out.
+
+Between back-to-back benchmarks on the same runtime you can skip the
+reboot — the runtime process itself keeps state clean. Between
+benchmarks on *different* runtimes (e.g. vLLM → TRT), reboot. Between
+any benchmark and a number you want to publish, reboot.
+
 ## Run order
 
 ```bash

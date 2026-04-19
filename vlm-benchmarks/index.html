@@ -155,6 +155,31 @@
         }
         .tldr strong { color: var(--heading); }
 
+        .figure {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        .figure img {
+            max-width: 100%;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .figure figcaption {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .model-output {
+            background: var(--card-bg);
+            border-left: 3px solid var(--accent);
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.97rem;
+        }
+
         .warning {
             background: #ffe0e0;
             border-left: 4px solid #d32f2f;
@@ -490,6 +515,23 @@ sudo reboot</code></pre>
 
         <p>
             The Concat adds one extra kernel launch per forward pass — microseconds at batch 1, not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code> and produces fluent descriptions of the bus image.
+        </p>
+
+        <figure class="figure">
+            <img src="assets/images/bus.jpg" alt="Street scene: two pedestrians walking past a blue bus">
+            <figcaption>Input image used for the image benchmark (<code>assets/images/bus.jpg</code>).</figcaption>
+        </figure>
+
+        <p>
+            Cosmos-Reason2-2B running through TRT Edge-LLM on the Orin Nano, asked <em>"What do you see in this image?"</em>, produces:
+        </p>
+
+        <div class="model-output">
+            In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.
+        </div>
+
+        <p>
+            ~100 tokens of grounded description, generated in about 2 seconds on a $250 board at 4.3 GB memory footprint. Deterministic across runs at temperature 0 — the same text comes back every call. This is the qualitative shape of what edge VLM inference looks like in 2026: small enough to fit, fast enough to be usable, accurate enough to describe a scene a planner or operator can act on.
         </p>
 
         <h3>TRT Edge-LLM: numbers</h3>

@@ -134,8 +134,10 @@ tutorial — see the runtime's README in `device/trt_cosmos_patches/`.
 
 ## Hardware setup
 
+One-time setup per device:
+
 ```bash
-# MAXN_SUPER and max clocks (every benchmark run starts with this)
+# MAXN_SUPER and max clocks
 sudo nvpmodel -m 2
 sudo jetson_clocks
 
@@ -146,6 +148,11 @@ sudo reboot
 # Swap: on for production runs, off for memory-measurement sessions
 # (zram is default 3.7 GB; add 8 GB swapfile for kernel build or heavy tactics)
 ```
+
+Per-session: run the pre-benchmark hygiene routine — see
+[`device/README.md`](./device/README.md#pre-benchmark-hygiene-routine).
+It's a 90-second reboot + 6-line validation paste that establishes a
+known-clean state so numbers are comparable across runs and runtimes.
 
 ## Phase plan (current)
 
