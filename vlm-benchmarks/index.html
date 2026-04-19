@@ -218,7 +218,7 @@
 
         <div class="tldr">
             <strong>TL;DR</strong><br><br>
-            I benchmarked Cosmos-Reason2-2B, NVIDIA's physical-AI VLM, across three inference runtimes on a Jetson Orin Nano 8 GB: <strong>llama.cpp</strong>, <strong>vLLM</strong>, and <strong>TensorRT Edge-LLM</strong>. Same model, same quantization class, same hardware. llama.cpp worked out of the box. vLLM needed a community-quantized W4A16 checkpoint and a vision-encoder profile cap to fit under the Orin Nano's contiguous-allocation ceiling. TRT-Edge-LLM took the most work: a kernel-level CMA parameter plus an ONNX graph rewrite to split the LM head MatMul. As far as I can tell this is the first public report of Cosmos-Reason2-2B running on TRT-Edge-LLM on an Orin Nano — NVIDIA's own supported matrix pairs this combination with Thor, not Orin.<br><br>
+            I benchmarked Cosmos-Reason2-2B, NVIDIA's physical-AI VLM, across three inference runtimes on a Jetson Orin Nano 8 GB: <strong>llama.cpp</strong>, <strong>vLLM</strong>, and <strong>TensorRT Edge-LLM</strong>. Same model, same quantization class, same hardware. llama.cpp worked out of the box. vLLM needed a community-quantized W4A16 checkpoint and a vision-encoder profile cap to fit under the Orin Nano's contiguous-allocation ceiling. TRT Edge-LLM took the most work: a kernel-level CMA parameter plus an ONNX graph rewrite to split the LM head MatMul. As far as I can tell this is the first public report of Cosmos-Reason2-2B running on TRT Edge-LLM on an Orin Nano — NVIDIA's own supported matrix pairs this combination with Thor, not Orin.<br><br>
             Final numbers: <strong>TRT Edge-LLM 60 TPS, vLLM 56 TPS, llama.cpp 38 TPS</strong> on Cosmos-Reason2-2B at W4A16 / Q4_K_M. TRT wins decode throughput and uses the least memory (4.3 GB peak vs vLLM's 6.9 GB). vLLM wins image first-token latency when warm (75 ms vs TRT's 420 ms). llama.cpp wins context length (4096 vs 1024) and has a cleaner startup story.<br><br>
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
@@ -674,7 +674,7 @@ sudo reboot</code></pre>
 
         <h3>Vendor support matrices are lower bounds, not ceilings</h3>
         <p>
-            NVIDIA's Jetson AI Lab tutorial pairs Cosmos-Reason2 <em>8B</em> with Thor (128 GB unified memory) and pairs Orin Nano with Qwen3-4B-Instruct — a text-only LLM, not a VLM. There's no official recipe anywhere for Cosmos-Reason2-2B on Orin Nano via TRT-Edge-LLM. That absence is informative, but it isn't a ban. With a kernel-level CMA change and an ONNX graph rewrite, the combination works and performs competitively. "Not officially supported" on an edge platform often means "works after you do the platform-level work to make it work" — not "actually impossible."
+            NVIDIA's Jetson AI Lab tutorial pairs Cosmos-Reason2 <em>8B</em> with Thor (128 GB unified memory) and pairs Orin Nano with Qwen3-4B-Instruct — a text-only LLM, not a VLM. There's no official recipe anywhere for Cosmos-Reason2-2B on Orin Nano via TRT Edge-LLM. That absence is informative, but it isn't a ban. With a kernel-level CMA change and an ONNX graph rewrite, the combination works and performs competitively. "Not officially supported" on an edge platform often means "works after you do the platform-level work to make it work" — not "actually impossible."
         </p>
 
         <h3>Watch the allocator, not the model</h3>

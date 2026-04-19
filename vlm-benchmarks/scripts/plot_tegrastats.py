@@ -105,7 +105,7 @@ def main():
     axes[2].grid(alpha=0.25)
 
     fig.suptitle(
-        "Runtime utilization during one 5-run streaming benchmark",
+        "Runtime utilization during one bench_trt.sh run (text then image)",
         fontsize=11,
     )
     fig.tight_layout()

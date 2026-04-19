@@ -158,15 +158,15 @@ known-clean state so numbers are comparable across runs and runtimes.
 
 | Phase | Where     | What                                                           | Status |
 |-------|-----------|----------------------------------------------------------------|--------|
-| 0     | Host      | AWQ quantize + ONNX export for TRT-Edge-LLM (on A40 pod, ~30 min). See [`host/README.md`](./host/README.md). | ✅ |
+| 0     | Host      | AWQ quantize + ONNX export for TRT Edge-LLM (on A40 pod, ~30 min). See [`host/README.md`](./host/README.md). | ✅ |
 | 1a    | Orin Nano | Verify JetPack ≥ 6.2.2 (L4T ≥ 36.5.0). Upgrade via apt if on 6.2.1. See `device/README.md`. | ✅ |
-| 1b    | Orin Nano | Build TRT-Edge-LLM C++ runtime + plugin library. | ✅ |
+| 1b    | Orin Nano | Build TRT Edge-LLM C++ runtime + plugin library. | ✅ |
 | 1c    | Orin Nano | Download Cosmos-Reason2-2B GGUF, merge splits, quantize to Q4_K_M. | ✅ |
 | 2a    | Orin Nano | llama.cpp — launch server, run text + image benchmarks, concurrency sweep. | ✅ |
 | 2b    | Orin Nano | vLLM — launch server with Embedl W4A16, run benchmark suite. | ✅ |
 | 2c    | Orin Nano | TRT Edge-LLM — kernel CMA setup (`cma=950M`), ONNX graph surgery (split LM head), engine build, text + image benchmarks. | ✅ |
-| 3     | Orin Nano | Capture Nsight profiles for the same prompt on each runtime. | ⏳ |
-| 4     | Anywhere  | Plots, roofline analysis, writeup. | ⏳ |
+| 3     | Orin Nano | Profiling — Nsight Systems timeline for TRT, tegrastats utilization trace for TRT. See blog §11. vLLM/llama.cpp Nsight deferred (docker containers without `--pid=host` + nsys 2024.5 limitation). | ✅ (TRT only) |
+| 4     | Anywhere  | Writeup in `index.html`; tegrastats plot via `scripts/plot_tegrastats.py`. Roofline analysis deferred. | ✅ |
 
 ## Reproducing
 
