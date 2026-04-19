@@ -4,11 +4,6 @@ __pycache__/
 .venv*/
 *.egg-info/
 
-# Results — keep CSVs and plots, drop raw bulk artifacts
-vlm-benchmarks/assets/results/raw/*.json
-vlm-benchmarks/assets/results/nsight_profiles/*.nsys-rep
-vlm-benchmarks/assets/results/nsight_profiles/*.qdrep
-
 # Model / engine artifacts (multi-GB, rebuilt per machine)
 *.onnx
 *.engine
