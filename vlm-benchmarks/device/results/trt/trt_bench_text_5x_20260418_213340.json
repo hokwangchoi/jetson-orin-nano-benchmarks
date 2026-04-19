@@ -1,0 +1,95 @@
+{
+    "input_file": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../inputs/trt/bench_text_5x.json",
+    "responses": [
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\nWrite a short paragraph about the importance of renewable energy.<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "text": "Write a short paragraph about the importance of renewable energy.",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "Renewable energy is crucial for combating climate change and ensuring a sustainable future. By harnessing sources like solar, wind, and hydroelectric power, we reduce reliance on fossil fuels, lower greenhouse gas emissions, and protect ecosystems. Investing in renewables fosters energy independence, creates jobs, and strengthens communities. Transitioning to renewable energy empowers nations to achieve environmental, economic, and social resilience for generations to come.",
+            "request_idx": 0
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\nWrite a short paragraph about the importance of renewable energy.<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "text": "Write a short paragraph about the importance of renewable energy.",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "Renewable energy is crucial for combating climate change and ensuring a sustainable future. By harnessing sources like solar, wind, and hydroelectric power, we reduce reliance on fossil fuels, lower greenhouse gas emissions, and protect ecosystems. Investing in renewables fosters energy independence, creates jobs, and strengthens communities. Transitioning to renewable energy empowers nations to achieve environmental, economic, and social resilience for generations to come.",
+            "request_idx": 1
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\nWrite a short paragraph about the importance of renewable energy.<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "text": "Write a short paragraph about the importance of renewable energy.",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "Renewable energy is crucial for combating climate change and ensuring a sustainable future. By harnessing sources like solar, wind, and hydroelectric power, we reduce reliance on fossil fuels, lower greenhouse gas emissions, and protect ecosystems. Investing in renewables fosters energy independence, creates jobs, and strengthens communities. Transitioning to renewable energy empowers nations to achieve environmental, economic, and social resilience for generations to come.",
+            "request_idx": 2
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\nWrite a short paragraph about the importance of renewable energy.<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "text": "Write a short paragraph about the importance of renewable energy.",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "Renewable energy is crucial for combating climate change and ensuring a sustainable future. By harnessing sources like solar, wind, and hydroelectric power, we reduce reliance on fossil fuels, lower greenhouse gas emissions, and protect ecosystems. Investing in renewables fosters energy independence, creates jobs, and strengthens communities. Transitioning to renewable energy empowers nations to achieve environmental, economic, and social resilience for generations to come.",
+            "request_idx": 3
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\nWrite a short paragraph about the importance of renewable energy.<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "text": "Write a short paragraph about the importance of renewable energy.",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "Renewable energy is crucial for combating climate change and ensuring a sustainable future. By harnessing sources like solar, wind, and hydroelectric power, we reduce reliance on fossil fuels, lower greenhouse gas emissions, and protect ecosystems. Investing in renewables fosters energy independence, creates jobs, and strengthens communities. Transitioning to renewable energy empowers nations to achieve environmental, economic, and social resilience for generations to come.",
+            "request_idx": 4
+        }
+    ]
+}

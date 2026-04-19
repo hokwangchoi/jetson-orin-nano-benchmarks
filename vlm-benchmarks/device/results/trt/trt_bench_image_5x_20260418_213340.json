@@ -1,0 +1,115 @@
+{
+    "input_file": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../inputs/trt/bench_image_5x.json",
+    "responses": [
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>What do you see in this image?<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/bus.jpg",
+                            "type": "image"
+                        },
+                        {
+                            "text": "What do you see in this image?",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.",
+            "request_idx": 0
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>What do you see in this image?<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/bus.jpg",
+                            "type": "image"
+                        },
+                        {
+                            "text": "What do you see in this image?",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.",
+            "request_idx": 1
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>What do you see in this image?<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/bus.jpg",
+                            "type": "image"
+                        },
+                        {
+                            "text": "What do you see in this image?",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.",
+            "request_idx": 2
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>What do you see in this image?<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/bus.jpg",
+                            "type": "image"
+                        },
+                        {
+                            "text": "What do you see in this image?",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.",
+            "request_idx": 3
+        },
+        {
+            "batch_idx": 0,
+            "formatted_complete_request": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>What do you see in this image?<|im_end|>\n<|im_start|>assistant\n",
+            "formatted_system_prompt": "",
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/bus.jpg",
+                            "type": "image"
+                        },
+                        {
+                            "text": "What do you see in this image?",
+                            "type": "text"
+                        }
+                    ],
+                    "role": "user"
+                }
+            ],
+            "output_text": "In the foreground, two individuals are walking side by side on a paved sidewalk. The person on the left is clad in a beige coat, blue jeans, and tan boots, while the person on the right wears a black coat, blue jeans, and black boots. Behind them, a blue bus with a white roof and a green logo is parked on the street. The bus displays a route number and destination on its side. Adjacent to the bus, a building with balconies and windows forms the backdrop. Further back, a stop sign is visible, along with a tree that adds a touch of greenery to the urban setting.",
+            "request_idx": 4
+        }
+    ]
+}

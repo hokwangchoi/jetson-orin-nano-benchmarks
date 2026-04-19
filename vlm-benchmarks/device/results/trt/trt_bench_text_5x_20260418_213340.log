@@ -1,0 +1,471 @@
+[21:33:43.210] [INFO] [llm_inference.cpp:272:parseLLMInferenceArgs] args.inputFile: /home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../inputs/trt/bench_text_5x.json
+[21:33:43.211] [INFO] [llm_inference.cpp:278:parseLLMInferenceArgs] args.engineDir: /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm
+[21:33:43.211] [INFO] [llm_inference.cpp:286:parseLLMInferenceArgs] args.multimodalEngineDir: /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine/visual
+[21:33:43.211] [INFO] [llm_inference.cpp:294:parseLLMInferenceArgs] args.outputFile: /home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../results/trt/trt_bench_text_5x_20260418_213340.json
+[21:33:43.211] [INFO] [llm_inference.cpp:303:parseLLMInferenceArgs] args.profileOutputFile: /home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../results/trt/trt_profile_text_5x_20260418_213340.json
+[21:33:43.211] [INFO] [llm_inference.cpp:308:parseLLMInferenceArgs] Profile dumping to console is enabled
+[21:33:43.211] [INFO] [llm_inference.cpp:313:parseLLMInferenceArgs] Warmup runs: 2
+[21:33:43.217] [INFO] [memoryMonitor.cpp:65:start] Memory Monitor Started - iGPU detected, monitoring unified memory through RSS
+[21:33:43.217] [INFO] [trtUtils.h:62:loadEdgellmPluginLib] EDGELLM_PLUGIN_PATH: /home/hc/TensorRT-Edge-LLM/build/libNvInfer_edgellm_plugin.so
+[21:33:43.220] [INFO] [llm_inference.cpp:662:main] Successfully parsed 0 LoRA weights from input file.
+[21:33:43.220] [INFO] [llm_inference.cpp:663:main] Successfully parsed 5 batches of requests from input file.
+[21:33:43.266] [INFO] [llmInferenceRuntime.cpp:135:LLMInferenceRuntime] Loading embedding table from: /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm/embedding.safetensors
+[21:33:43.438] [INFO] [llmInferenceRuntime.cpp:146:LLMInferenceRuntime] Embedding table loaded successfully with shape [151936, 2048]
+[21:33:43.438] [INFO] [llmEngineRunner.cpp:109:LLMEngineRunner] Loading config file /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm/config.json
+[21:33:43.438] [INFO] [llmRuntimeUtils.cpp:163:collectRopeConfig] Collected rope config: RopeConfig:  type: MRope  rotaryScale: 1  rotaryTheta: 5e+06  maxPositionEmbeddings: 262144
+[21:33:43.438] [INFO] [llmEngineRunner.cpp:629:initializeConfigFromJson] initializeConfigFromJson(): Loaded LLMEngineRunner with config: LLMEngineRunnerConfig:  enableEagleSpecDecode: false  numDecoderLayers: 28  numKVHeads: 8  headDim: 128  rotaryDim: 128  hiddenSize: 2048  maxSupportedBatchSize: 1  maxSupportedInputLength: 1024  maxKVCacheCapacity: 1024  maxSupportedLoraRank: 0  numDeepstackFeatures: 3
+[21:33:43.438] [INFO] [llmEngineRunner.cpp:137:LLMEngineRunner] Loading engine file: /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm/llm.engine
+[21:33:43.444] [INFO] [TensorRT] Loaded engine size: 1300 MiB
+[21:33:44.033] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.034] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.035] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.036] [INFO] [TensorRT] Initializing plugin at: allocateResources
+[21:33:44.049] [INFO] [TensorRT] [MS] Running engine with multi stream info
+[21:33:44.049] [INFO] [TensorRT] [MS] Number of aux streams is 2
+[21:33:44.049] [INFO] [TensorRT] [MS] Number of total worker streams is 3
+[21:33:44.049] [INFO] [TensorRT] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[21:33:45.611] [INFO] [TensorRT] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +0, now: CPU 0, GPU 1287 (MiB)
+[21:33:45.611] [INFO] [llmEngineRunner.cpp:164:LLMEngineRunner] Allocated a device memory of 52430336 bytes for the prefill and generation context.
+[21:33:45.715] [INFO] [llmInferenceRuntime.cpp:158:LLMInferenceRuntime] LLMEngineRunner successfully loaded and initialized llm engine.
+[21:33:45.722] [INFO] [llmInferenceRuntime.cpp:192:LLMInferenceRuntime] Allocated 3 deepstack embeds tensors with shape [1, 1024, 2048]
+[21:33:45.722] [INFO] [llmInferenceRuntime.cpp:218:LLMInferenceRuntime] Start loading tokenizer from model directory: /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm
+[21:33:46.210] [INFO] [tokenizer.cpp:383:loadVocabulary] Loaded 151643 vocabulary tokens
+[21:33:46.343] [INFO] [tokenizer.cpp:94:loadFromHF] Loaded 26 special tokens
+[21:33:46.405] [INFO] [tokenizer.cpp:729:loadChatTemplate] Successfully loaded chat template from /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm/processed_chat_template.json (for model: Cosmos-Reason2-2B/quantized)
+[21:33:46.405] [INFO] [tokenizer.cpp:121:loadFromHF] Successfully loaded tokenizer from /home/hc/tensorrt-edgellm-workspace/Cosmos-Reason2-2B-split/engine-1024/llm (vocab_size=151669)
+[21:33:46.442] [INFO] [TensorRT] Loaded engine size: 789 MiB
+[21:33:46.807] [INFO] [TensorRT] [MS] Running engine with multi stream info
+[21:33:46.807] [INFO] [TensorRT] [MS] Number of aux streams is 3
+[21:33:46.807] [INFO] [TensorRT] [MS] Number of total worker streams is 4
+[21:33:46.807] [INFO] [TensorRT] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[21:33:47.405] [INFO] [TensorRT] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +186, now: CPU 0, GPU 2255 (MiB)
+[21:33:47.466] [INFO] [llmInferenceRuntime.cpp:268:operator()] Vision runner successfully initialized
+[21:33:47.466] [INFO] [TensorRT] Switching optimization profile from: 0 to 1. Please ensure there are no enqueued operations pending in this context prior to switching profiles
+[21:33:47.745] [INFO] [llmInferenceRuntime.cpp:843:captureDecodingCUDAGraph] LLMInferenceRuntime(): Successfully captured the decoding CUDA graph for all execution batch sizes and LoRA weights.
+[21:33:47.745] [INFO] [llm_inference.cpp:728:main] Starting warmup with 2 runs using the first request...
+[21:33:47.745] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:47.745] [INFO] [TensorRT] Switching optimization profile from: 1 to 0. Please ensure there are no enqueued operations pending in this context prior to switching profiles
+[21:33:49.148] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:50.508] [INFO] [llm_inference.cpp:750:main] Warmup of 2 runs completed. Starting actual benchmark runs...
+[21:33:50.508] [INFO] [llm_inference.cpp:768:main] Processing 5 batched requests...
+[21:33:50.508] [INFO] [llm_inference.cpp:778:main] Progress: 1/5 (20.000000%)
+[21:33:50.508] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:51.868] [INFO] [llm_inference.cpp:778:main] Progress: 2/5 (40.000000%)
+[21:33:51.868] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:53.228] [INFO] [llm_inference.cpp:778:main] Progress: 3/5 (60.000000%)
+[21:33:53.228] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:54.588] [INFO] [llm_inference.cpp:778:main] Progress: 4/5 (80.000000%)
+[21:33:54.588] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:55.948] [INFO] [llm_inference.cpp:778:main] Progress: 5/5 (100.000000%)
+[21:33:55.949] [WARNING] [sampling.h:72:SamplingParams] Temperature is 0.0f, but topK is not 1 or topP is not 1.0f, this may cause numerical instability. Setting topK to 1 and topP to 1.0f
+[21:33:57.309] [INFO] [llm_inference.cpp:858:main] Processing complete: 5/5 batched requests successful
+[21:33:57.309] [INFO] [llm_inference.cpp:897:main] 
+=== Performance Summary ===
+=== LLM Prefill ===
+Reused Tokens: 0
+Computed Tokens: 95
+Average Tokens per Run: 19.00
+Average Time per Run: 29.2234 ms
+Tokens/Second: 650.2
+Average Time per Token: 1.5381 ms
+LLM Prefill - Total Runs: 5, Total GPU Time: 146.12 ms, Average: 29.22 ms
+=== LLM Generation (Excluding sampling after prefill) ===
+Generated Tokens: 415
+Average Tokens per Run: 83.00
+Tokens/Second: 62.4
+Average Time per Token: 16.0309 ms
+LLM Generation - Total Runs: 5, Total GPU Time: 6652.82 ms, Average: 1330.56 ms
+=== Memory Usage ===
+Peak Unified Memory: 4327.75 MB (4537970688 bytes)
+=====================================
+
+[21:33:57.309] [INFO] [llm_inference.cpp:946:main] Profile data exported to: /home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../results/trt/trt_profile_text_5x_20260418_213340.json
+[21:33:57.309] [INFO] [llm_inference.cpp:969:main] All responses exported to: /home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/device/scripts/../results/trt/trt_bench_text_5x_20260418_213340.json
