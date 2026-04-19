@@ -235,12 +235,10 @@ vlm-benchmarks/
     └── results/               # per-runtime JSONs + logs
         ├── llamacpp/
         ├── vllm/
-        └── trt/
+        ├── trt/
+        ├── nsight/            # TRT Nsight Systems captures (§11)
+        └── tegrastats/        # TRT utilization traces + plot (§11)
 ```
-
-Planned but not yet materialised: an `analysis/` directory for Phase 4
-plots and roofline analysis (including Nsight captures once Phase 3
-lands).
 
 ## References
 

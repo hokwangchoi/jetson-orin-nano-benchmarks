@@ -505,11 +505,11 @@ sudo reboot</code></pre>
         </p>
 
         <pre><code class="language-text"># Failing (256 MiB CMA):
-19:59:09  CmaFree 779 MB   ← idle, before Myelin starts the LM head
+19:59:09  CmaFree 248 MB   ← idle, before Myelin starts the LM head
 19:59:13  CmaFree  36 MB   ← tactic 0 retry 4
 19:59:14  CmaFree   0 MB   ← pool wedged
 19:59:18  CmaFree   0 MB
-19:59:21  CmaFree 932 MB   ← released only after build error propagates
+19:59:21  CmaFree 244 MB   ← released only after build error propagates
 
 # Succeeding (960 MiB CMA + split surgery below):
 # CmaFree briefly drops to ~350 MB during tactic 1's 593 MB allocation,
@@ -593,7 +593,7 @@ sudo reboot</code></pre>
         <h2>11. Profiling: what the decode loop actually looks like</h2>
 
         <p>
-            The numbers in §10 answer "how fast," but not "why" or "how stable." To see whether inference has the rhythm the architecture predicts, I captured two things on TRT Edge-LLM: a kernel-level timeline with Nsight Systems, and a coarser system-level utilization trace with <code>tegrastats</code>. vLLM and llama.cpp both run inside docker containers without <code>--pid=host</code>, which makes host-side <code>nsys</code> capture impractical on the Nsight Systems 2024.5 that ships with this JetPack — so the kernel-level view here is TRT-only. What the other two runtimes' traces would probably show, qualitatively, is at the end of this section.
+            The numbers in §10 answer "how fast," but not "why" or "how stable." To see whether inference has the rhythm the architecture predicts, I captured two things on TRT Edge-LLM: a kernel-level timeline with Nsight Systems, and a coarser system-level utilization trace with <code>tegrastats</code>. vLLM and llama.cpp both run inside docker containers without <code>--pid=host</code>, which makes host-side <code>nsys</code> capture impractical on the Nsight Systems 2024.5 that ships with this JetPack — so the kernel-level view here is TRT-only.
         </p>
 
         <h3>One inference, three phases</h3>
@@ -631,20 +631,6 @@ sudo reboot</code></pre>
 
         <p>
             Three things jump out. <strong>GPU utilization pins at 99%</strong> during both text and image phases — we're bandwidth-bound on the 68 GB/s LPDDR5, and <code>tegrastats</code>' 100 ms sample doesn't see the 16 ms per-token breathing room. <strong>RAM settles at ~4.2 GB</strong> during inference (matches the 4.3 GB peak we published within noise), drops to ~1.5 GB in the gap at t ≈ 9–14 s — which is <code>bench_trt.sh</code> spawning a second <code>llm_inference</code> process for the image workload after the text one exits, releasing and then reloading the engines — then climbs back up. <strong>Power draws ~21 W during inference vs 7 W idle</strong>: roughly 14 W per forward pass at one pass every 16 ms works out to about 0.23 J per generated token. Not a published figure, just a number that falls out of the trace.
-        </p>
-
-        <h3>What the other two runtimes' traces would probably show</h3>
-
-        <p>
-            Without equivalent captures for vLLM and llama.cpp, there's some extrapolation here, but the benchmark numbers and runtime architectures constrain the story:
-        </p>
-
-        <p>
-            <strong>vLLM</strong> also uses <code>torch.compile</code> to capture decode into a CUDA graph, so the GPU-side picture should look similar — replay per token, full utilization, tight rhythm. The difference would be on the host side: vLLM's hot path still dispatches through Python, so expect visible Python bookkeeping between graph replays in the CUDA API row. That's likely where the ~1 ms TPOT gap vs TRT comes from (17 vs 16 ms) — not kernel quality, Python glue.
-        </p>
-
-        <p>
-            <strong>llama.cpp</strong> is the different shape. It doesn't use CUDA graphs at all — decode is a per-step launch of many small <code>ggml-cuda</code> kernels. In an Nsight trace you'd see the CUDA HW row filled with small colorful rectangles rather than one solid block, and the CUDA API row showing a per-kernel <code>cudaLaunchKernel</code> rhythm. 26 ms TPOT = ~10 ms more than TRT, plausibly dominated by launch overhead and less aggressive kernel fusion rather than the actual math. Capturing this cleanly needs either <code>--pid=host</code> on the <code>llamacpp-serve</code> container, or running <code>nsys</code> inside the container. Worth doing as a follow-up; not required for the story.
         </p>
 
         <h2>12. What I actually learned</h2>
