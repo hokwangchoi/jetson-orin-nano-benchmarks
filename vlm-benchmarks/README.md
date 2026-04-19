@@ -151,7 +151,7 @@ sudo reboot
 
 | Phase | Where     | What                                                           | Status |
 |-------|-----------|----------------------------------------------------------------|--------|
-| 0     | Host      | AWQ quantize + ONNX export for TRT-Edge-LLM (on A40 pod, ~30 min). Done on ephemeral pod; artifacts scp'd to Jetson. | ✅ |
+| 0     | Host      | AWQ quantize + ONNX export for TRT-Edge-LLM (on A40 pod, ~30 min). See [`host/README.md`](./host/README.md). | ✅ |
 | 1a    | Orin Nano | Verify JetPack ≥ 6.2.2 (L4T ≥ 36.5.0). Upgrade via apt if on 6.2.1. See `device/README.md`. | ✅ |
 | 1b    | Orin Nano | Build TRT-Edge-LLM C++ runtime + plugin library. | ✅ |
 | 1c    | Orin Nano | Download Cosmos-Reason2-2B GGUF, merge splits, quantize to Q4_K_M. | ✅ |
@@ -201,6 +201,10 @@ TRT-Edge-LLM `llm_inference` CLI directly since it isn't an HTTP server.
 vlm-benchmarks/
 ├── README.md                  # this file
 ├── index.html                 # blog post
+├── host/                      # Phase 0 — x86/A40 host
+│   ├── README.md              # Phase 0 walkthrough
+│   ├── scripts/               # 01_quantize, 02_export_llm, 03_export_visual, 04_package
+│   └── calibration/           # AWQ calibration data (see calibration/README.md)
 ├── device/                    # Jetson setup
 │   ├── README.md              # JetPack upgrade + hardware setup
 │   ├── scripts/               # 03_* vLLM, 10_-11_* llama.cpp, 40_-41_* TRT
@@ -227,11 +231,9 @@ vlm-benchmarks/
         └── trt/
 ```
 
-Planned but not yet materialised: a `host/` directory for the x86/A40
-quantization + ONNX export pipeline (Phase 0 was done on an ephemeral
-pod; the scripts will be committed when the host path is reproducible
-from cold), and an `analysis/` directory for Phase 4 plots and roofline
-analysis (including Nsight captures once Phase 3 lands).
+Planned but not yet materialised: an `analysis/` directory for Phase 4
+plots and roofline analysis (including Nsight captures once Phase 3
+lands).
 
 ## References
 

@@ -130,6 +130,10 @@ for the patches and scripts.*
 └── vlm-benchmarks/              # complete
     ├── README.md                # story, methodology, phase plan
     ├── index.html               # blog post
+    ├── host/                    # Phase 0 — x86 host quantize + ONNX export
+    │   ├── README.md
+    │   ├── scripts/             # 01-04 quantize/export/package
+    │   └── calibration/
     ├── device/                  # Jetson — runtime setup + serving
     │   ├── README.md            # JetPack upgrade, hardware setup
     │   ├── scripts/             # 03_* vLLM, 10_-11_* llama.cpp, 40_-41_* TRT

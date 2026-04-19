@@ -618,7 +618,15 @@ cat device/README.md  # L4T upgrade section</code></pre>
 
         <h3>TRT Edge-LLM</h3>
 
-        <pre><code class="language-bash"># One-time: CMA config + ONNX graph surgery (see §9)
+        <pre><code class="language-bash"># Phase 0 — quantize + export on an x86 host with a datacenter GPU
+# (A40/L40S/A100/H100 — anything with ≥40 GB VRAM). ~30 min total.
+cat host/README.md
+./host/scripts/01_quantize_llm.sh
+./host/scripts/02_export_llm.sh
+./host/scripts/03_export_visual.sh
+./host/scripts/04_package_for_jetson.sh      # tar + scp to Jetson
+
+# On the Jetson — CMA config + ONNX graph surgery (see §9)
 cat device/trt_cosmos_patches/README.md             # operator-facing recipe
 python3 device/trt_cosmos_patches/split_lm_head.py  # graph rewrite
 
