@@ -2,6 +2,7 @@
   "temperature": 0.0,
   "max_generate_length": 200,
   "add_generation_prompt": true,
+  "_comment": "Single-shot qualitative query used for the blog post opener. Path to assets/images/driving.jpg is absolute and should be adjusted for the local checkout. See scripts/bench_trt.sh for the llm_inference invocation pattern.",
   "requests": [
     {"messages": [{"role": "user", "content": [
       {"type": "image", "image": "/home/hc/code/jetson-orin-nano-benchmarks/vlm-benchmarks/assets/images/driving.jpg"},

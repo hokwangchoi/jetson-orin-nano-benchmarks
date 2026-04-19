@@ -223,6 +223,23 @@
             <strong>Code:</strong> <a href="https://github.com/hokwangchoi/jetson-orin-nano-benchmarks">github.com/hokwangchoi/jetson-orin-nano-benchmarks</a>
         </div>
 
+        <p>
+            To make the capability concrete before any numbers — here's Cosmos-Reason2-2B running through TRT Edge-LLM on the Orin Nano, looking at a driver-POV scene and answering a direct operational question.
+        </p>
+
+        <figure class="figure">
+            <img src="assets/images/driving.jpg" alt="Driver's POV from inside a car: cyclist with a yellow backpack crossing ahead on an urban street, parked cars on both sides, silver hatchback braking ahead-left">
+            <figcaption>Driver's POV fed to the VLM.</figcaption>
+        </figure>
+
+        <p>
+            Prompt: <em>"I am driving this car and moving forward fast. Describe the scene and tell me what action I should take next."</em>
+        </p>
+
+        <div class="model-output">
+            Of course, I see the bicyclist ahead of me, so I should slow down and give them enough space to pass safely.
+        </div>
+
         <h2>1. Why this comparison</h2>
 
         <p>
@@ -514,24 +531,7 @@ sudo reboot</code></pre>
         </p>
 
         <p>
-            The Concat adds one extra kernel launch per forward pass — microseconds at batch 1, not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code> and produces fluent scene descriptions — the sort of grounded visual reasoning a planner or operator needs in an autonomous-driving context.
-        </p>
-
-        <figure class="figure">
-            <img src="assets/images/driving_exit.jpg" alt="Dashcam-style view of a highway approaching an exit ramp with overhead signage">
-            <figcaption>Driving scenario presented to the VLM: highway with an upcoming right-hand exit to downtown.</figcaption>
-        </figure>
-
-        <p>
-            Cosmos-Reason2-2B running through TRT Edge-LLM on the Orin Nano, asked <em>"What do you see in this image? Should the car take the exit or continue straight?"</em>, produces:
-        </p>
-
-        <div class="model-output">
-            <em>[Model output to be inserted after running <code>bench_trt.sh</code> with <code>IMAGE_PATH=assets/images/driving_exit.jpg</code> — the description this 2B model generates at 60 tok/s on a $250 board, deterministic at temperature 0.]</em>
-        </div>
-
-        <p>
-            ~100 tokens of grounded scene understanding, generated in about 2 seconds at a 4.3 GB memory footprint. Deterministic across runs at temperature 0 — the same text comes back every call. This is the qualitative shape of what edge VLM inference looks like in 2026: small enough to fit, fast enough to be usable, accurate enough to drive planner-level decisions.
+            The Concat adds one extra kernel launch per forward pass — microseconds at batch 1, not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code> and produces the kind of grounded, action-oriented output shown at the top of this post — exactly the shape of visual reasoning an autonomous-driving planner needs.
         </p>
 
         <h3>TRT Edge-LLM: numbers</h3>
@@ -685,14 +685,18 @@ python3 device/trt_cosmos_patches/split_lm_head.py  # graph rewrite
             Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, CMA traces, and methodology notes are all in <code>vlm-benchmarks/assets/results/</code>. Investigation writeups for the TRT workaround are in <code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code>.
         </p>
 
-        <h2>13. For the robotics and autonomous-driving engineers reading this</h2>
+        <h2>13. Closing</h2>
 
         <p>
-            The reason this work exists is that VLMs are becoming the grounded-reasoning layer in robotics and AV perception stacks, and the hardware they need to run on is a Jetson-class edge module — not a datacenter GPU. Getting a 2B VLM to serve at 60 tokens per second on a $250 board, in under 5 GB of memory, with a real Python-free inference runtime, is a concrete capability. It's enough to describe what a camera sees in close to real time, answer grounded questions about the scene, and feed structured reasoning traces to a planner.
+            The reason I did this work is that VLMs are showing up as the grounded-reasoning layer in robotics and autonomous-vehicle stacks, and the hardware they'll actually run on is Jetson-class edge silicon. I wanted to see for myself what it takes to get there in 2026 — not from a tutorial, not from a support matrix, just hands-on with a board and a model.
         </p>
 
         <p>
-            Nothing in this post is deeply inaccessible. The kernel parameter is one line in a config file. The graph surgery is 100 lines of Python. The runtime workarounds are well-scoped. If you're building a robot, a drone, a car, or an embedded safety system and you've been waiting for the edge VLM story to stop being a research preview — it already has. The platform is rough in places, but the capability is there. Build something with it.
+            Getting a 2B VLM to serve at 60 tokens/sec on a $250 board, in under 5 GB of memory, through a C++ inference runtime, turned out to be doable. The platform is rough in places — the contiguous-allocation behavior on Orin Nano is undocumented, the TRT Edge-LLM + Cosmos combination isn't in NVIDIA's support matrix for this hardware, JetPack has quirks between point releases — but the workarounds didn't need special access or tools, just patience with the failure modes. The kernel parameter is one line. The graph surgery is 100 lines of Python. The longest part was figuring out what the actual failure mode was.
+        </p>
+
+        <p>
+            What I take away: edge VLMs at this scale aren't a research preview anymore, but they aren't plug-and-play either. There's a working path, and it involves knowing the platform a layer or two below the runtime.
         </p>
 
         <footer>
