@@ -41,6 +41,35 @@ if [ -z "$ENGINE_PID" ]; then
 fi
 echo "=== Attaching to vLLM engine PID $ENGINE_PID ==="
 
+# Build JSON payloads once as temp files — avoids ARG_MAX limits from
+# stuffing ~480KB of base64 image data into a single curl -d argument
+# (base64 of a 358KB JPEG blows past the shell command line limit).
+PAYLOAD_DIR="$(mktemp -d)"
+trap 'rm -rf "$PAYLOAD_DIR"' EXIT
+
+python3 - "$IMAGE_PATH" "$MODEL" "$PROMPT" "$MAX_TOKENS" "$PAYLOAD_DIR" <<'PY'
+import base64, json, sys, os
+image_path, model, prompt, max_tokens, out_dir = sys.argv[1:]
+with open(image_path, 'rb') as f:
+    b64 = base64.b64encode(f.read()).decode('ascii')
+
+def req(prompt_text, tokens):
+    return {
+        "model": model,
+        "max_tokens": int(tokens),
+        "temperature": 0.0,
+        "messages": [{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            {"type": "text", "text": prompt_text}
+        ]}]
+    }
+
+with open(os.path.join(out_dir, 'warmup.json'), 'w') as f:
+    json.dump(req("warmup", 16), f)
+with open(os.path.join(out_dir, 'capture.json'), 'w') as f:
+    json.dump(req(prompt, max_tokens), f)
+PY
+
 # Warmup: same image + similar prompt as the captured request. This triggers
 # vLLM's lazy ViT CUDA graph capture (cudagraph_mm_encoder: False means the
 # graph is built on first image per unique input shape — ~500ms–3s spike on
@@ -49,20 +78,11 @@ echo "=== Attaching to vLLM engine PID $ENGINE_PID ==="
 # be dominated by a one-time compilation spike instead of showing the
 # steady-state inference we care about.
 echo "=== Sending 2 warmup image requests (not captured) ==="
-IMG_B64_WARMUP="$(base64 -w0 "$IMAGE_PATH")"
 for i in 1 2; do
     echo "  warmup $i/2..."
     curl -s -X POST "$SERVER_URL/v1/chat/completions" \
          -H "Content-Type: application/json" \
-         -d "{
-           \"model\":\"$MODEL\",
-           \"max_tokens\":16,
-           \"temperature\":0.0,
-           \"messages\":[{\"role\":\"user\",\"content\":[
-             {\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,$IMG_B64_WARMUP\"}},
-             {\"type\":\"text\",\"text\":\"warmup\"}
-           ]}]
-         }" >/dev/null
+         -d "@${PAYLOAD_DIR}/warmup.json" >/dev/null
 done
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
@@ -85,19 +105,9 @@ NSYS_PID=$!
 sleep 2
 
 echo "=== Firing image request ==="
-# Base64-encode image (vLLM expects data URL)
-IMG_B64="$(base64 -w0 "$IMAGE_PATH")"
 curl -s -X POST "$SERVER_URL/v1/chat/completions" \
      -H "Content-Type: application/json" \
-     -d "{
-       \"model\":\"$MODEL\",
-       \"max_tokens\":$MAX_TOKENS,
-       \"temperature\":0.0,
-       \"messages\":[{\"role\":\"user\",\"content\":[
-         {\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,$IMG_B64\"}},
-         {\"type\":\"text\",\"text\":\"$PROMPT\"}
-       ]}]
-     }" \
+     -d "@${PAYLOAD_DIR}/capture.json" \
      | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'][:200])"
 
 # Wait for nsys to finish the capture window
