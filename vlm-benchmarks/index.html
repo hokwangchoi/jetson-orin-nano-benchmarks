@@ -446,40 +446,6 @@ sudo reboot</code></pre>
             Variance is tight — TPOT holds to ±0.1 ms once warm. First image request in any batch runs 500 ms–3 s for TTFT because vLLM does not capture CUDA graphs for the vision encoder (<code>cudagraph_mm_encoder: False</code>); the ViT path compiles lazily on first use per unique input shape. After one or two warmup image requests, TTFT settles to ~77 ms. Steady-state memory is 6.9 GB resident with 362 MB available — near the ceiling, but stable.
         </p>
 
-        <h3>Head-to-head: Cosmos-Reason2-2B across runtimes</h3>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Runtime</th>
-                    <th>Quantization</th>
-                    <th>Context</th>
-                    <th>TTFT text</th>
-                    <th>TTFT image</th>
-                    <th>TPOT</th>
-                    <th>TPS</th>
-                    <th>Peak mem</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">58 ms</td><td class="num">306 ms</td><td class="num">27 ms</td><td class="num">38</td><td class="num">—</td></tr>
-                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">77 ms</td><td class="num">17 ms</td><td class="num">56</td><td class="num">6.9 GB</td></tr>
-                <tr><td>TRT Edge-LLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">29 ms</td><td class="num">420 ms</td><td class="num">17 ms</td><td class="num">60</td><td class="num">4.3 GB</td></tr>
-            </tbody>
-        </table>
-
-        <p>
-            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. Three distinct winners depending on what you optimize for. <strong>TRT leads on decode (60 vs 56 TPS)</strong>, on text TTFT (29 ms, 2× faster than either alternative), and on peak memory (4.3 GB vs vLLM's 6.9 GB — a 37% reduction). <strong>vLLM wins image TTFT post-warmup</strong> (77 ms vs TRT's 420 ms) because its vision encoder gets lazily compiled into CUDA graphs on first use and cached for subsequent requests. TRT pays the full ~200 ms ViT cost every time. <strong>llama.cpp loses on speed but wins context length</strong> (4096 vs 1024) — the only runtime on this hardware that can handle long reasoning traces. The TRT row took the most work to get: see §9 for what it took.
-        </p>
-
-        <p>
-            All three runtimes are memory-bandwidth-bound on a 2B model at batch 1 — Orin Nano's 68 GB/s LPDDR5 caps everyone — so the absolute decode gap is small (10 ms/token between fastest and slowest). TRT's ~3.5 ms TPOT advantage over vLLM comes from its <code>Int4GroupwiseGemmPlugin</code> wired directly into a fused CUDA graph with no Python in the hot path. llama.cpp's Q4_K_M GGUF goes through more general-purpose ggml-cuda kernels; vLLM sits in between, using Marlin W4A16 kernels inside a Python-orchestrated CUDA graph loop. TRT's 29 ms text TTFT is pure prefill time — no startup overhead, no tokenization surprise.
-        </p>
-
-        <p>
-            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, and TRT Edge-LLM bakes the max KV capacity into the engine at build time. On a 2B model at 8 GB with 5 GB already spoken for, 1024 is the largest context that fits for either. llama.cpp allocates KV cache on demand per slot and mmaps weights so cold pages can page out — 4096 context fits without drama. Real functional difference: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
-        </p>
-
         <h2>9. Getting TRT Edge-LLM building</h2>
 
         <p>
@@ -526,7 +492,63 @@ sudo reboot</code></pre>
             The Concat adds one extra kernel launch per forward pass — microseconds at batch 1, not visible in the benchmark numbers. The engine runs clean through <code>llm_inference</code> and produces fluent descriptions of the bus image.
         </p>
 
-        <h2>10. What I actually learned</h2>
+        <h3>TRT Edge-LLM: numbers</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Workload</th>
+                    <th>TTFT (ms)</th>
+                    <th>TPOT (ms)</th>
+                    <th>TPS (decode)</th>
+                    <th>Peak mem</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Text, 30-tok prompt</td><td class="num">29</td><td class="num">16.1</td><td class="num">62.2</td><td class="num">4.33 GB</td></tr>
+                <tr><td>Text+image, <code>bus.jpg</code></td><td class="num">420</td><td class="num">16.7</td><td class="num">59.8</td><td class="num">4.34 GB</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            Medians of 5 runs after 2 warmup passes, pristine boot, MAXN_SUPER, swap off. Image TTFT is ~208 ms visual-engine execution plus ~211 ms LLM prefill. Unlike vLLM, TRT's visual engine is pre-compiled into the built artifact so there's no lazy-warmup benefit — every image request pays the full ViT cost. TPOT is flat across text and image modes, as expected: once in the decode loop the vision tokens are just more prefix in the KV cache.
+        </p>
+
+        <h2>10. Head-to-head: Cosmos-Reason2-2B across runtimes</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Quantization</th>
+                    <th>Context</th>
+                    <th>TTFT text</th>
+                    <th>TTFT image</th>
+                    <th>TPOT</th>
+                    <th>TPS</th>
+                    <th>Peak mem</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>llama.cpp</td><td>Q4_K_M</td><td class="num">4096</td><td class="num">58 ms</td><td class="num">306 ms</td><td class="num">27 ms</td><td class="num">38</td><td class="num">—</td></tr>
+                <tr><td>vLLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">61 ms</td><td class="num">77 ms</td><td class="num">17 ms</td><td class="num">56</td><td class="num">6.9 GB</td></tr>
+                <tr><td>TRT Edge-LLM</td><td>W4A16 AWQ</td><td class="num">1024</td><td class="num">29 ms</td><td class="num">420 ms</td><td class="num">17 ms</td><td class="num">60</td><td class="num">4.3 GB</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            Same model, same quantization class (INT4 weights, FP16 activations), same hardware. Three distinct winners depending on what you optimize for. <strong>TRT leads on decode (60 vs 56 TPS)</strong>, on text TTFT (29 ms, 2× faster than either alternative), and on peak memory (4.3 GB vs vLLM's 6.9 GB — a 37% reduction). <strong>vLLM wins image TTFT post-warmup</strong> (77 ms vs TRT's 420 ms) because its vision encoder gets lazily compiled into CUDA graphs on first use and cached for subsequent requests. TRT pays the full ~200 ms ViT cost every time. <strong>llama.cpp loses on speed but wins context length</strong> (4096 vs 1024) — the only runtime on this hardware that can handle long reasoning traces.
+        </p>
+
+        <p>
+            All three runtimes are memory-bandwidth-bound on a 2B model at batch 1 — Orin Nano's 68 GB/s LPDDR5 caps everyone — so the absolute decode gap is small (10 ms/token between fastest and slowest). TRT's ~3.5 ms TPOT advantage over vLLM comes from its <code>Int4GroupwiseGemmPlugin</code> wired directly into a fused CUDA graph with no Python in the hot path. llama.cpp's Q4_K_M GGUF goes through more general-purpose ggml-cuda kernels; vLLM sits in between, using Marlin W4A16 kernels inside a Python-orchestrated CUDA graph loop. TRT's 29 ms text TTFT is pure prefill time — no startup overhead, no tokenization surprise.
+        </p>
+
+        <p>
+            Why llama.cpp wins context length: vLLM pre-allocates the KV cache upfront at <code>max-model-len</code>, and TRT Edge-LLM bakes the max KV capacity into the engine at build time. On a 2B model at 8 GB with 5 GB already spoken for, 1024 is the largest context that fits for either. llama.cpp allocates KV cache on demand per slot and mmaps weights so cold pages can page out — 4096 context fits without drama. Real functional difference: if your deployment needs long reasoning traces, llama.cpp is the only option on this hardware today.
+        </p>
+
+        <h2>11. What I actually learned</h2>
 
         <h3>Production runtimes are platform-fragile at the edge</h3>
         <p>
@@ -561,35 +583,59 @@ sudo reboot</code></pre>
             Two of the three walls I hit on this project were allocator walls, not model walls. vLLM's startup failure was a CUDA caching allocator interaction. TRT Edge-LLM's build failure was the kernel's CMA pool exhausting under Myelin's retry behavior. Both looked like model problems at first glance — "the VLM doesn't fit" — but the root causes were downstream of anything you'd find by reading the model architecture. On memory-constrained edge hardware, live-instrumenting the allocator (<code>/proc/meminfo</code>, <code>CmaFree</code>, per-process NvMap tracking) is more often the right move than reading more TRT docs.
         </p>
 
-        <h2>11. Reproducing this</h2>
+        <h2>12. Reproducing this</h2>
+
+        <h3>One-time setup</h3>
 
         <pre><code class="language-bash">git clone https://github.com/hokwangchoi/jetson-orin-nano-benchmarks.git
 cd jetson-orin-nano-benchmarks/vlm-benchmarks
 
 # Upgrade JetPack 6.2.1 → 6.2.2 if you're on an L4T 36.4.x build
-cat device/README.md  # L4T upgrade section
+cat device/README.md  # L4T upgrade section</code></pre>
 
-# llama.cpp path (works out of the box on 6.2.2)
-./device/scripts/10_prepare_llamacpp.sh      # download + quantize (~15 min)
-./device/scripts/11_run_llamacpp_server.sh   # serves on :8000
-./scripts/bench_llamacpp.sh                  # 5-run TTFT/TPOT/TPS
+        <p>
+            Each runtime needs its server (or engines, in TRT's case) up before the benchmark runs. Start the server in one terminal and run the benchmark from another.
+        </p>
 
-# vLLM path (works on 6.2.2 with W4A16 model + vision-encoder profile cap)
-./device/scripts/03_run_vllm_server.sh       # serves on :8000
-./scripts/bench_vllm.sh                      # 5-run TTFT/TPOT/TPS
+        <h3>llama.cpp</h3>
 
-# TRT Edge-LLM path (requires the workarounds from §9)
-cat device/trt_cosmos_patches/README.md             # CMA config, ONNX surgery
-python3 device/trt_cosmos_patches/split_lm_head.py  # one-time graph rewrite
-./device/scripts/40_build_cosmos_trt_engines.sh     # build LLM + visual engines
-./device/scripts/41_sanity_cosmos_trt.sh            # verify output correctness
-./scripts/bench_trt.sh                              # 5-run TTFT/TPOT/TPS</code></pre>
+        <pre><code class="language-bash"># One-time: download GGUF, merge splits, quantize to Q4_K_M (~15 min)
+./device/scripts/10_prepare_llamacpp.sh
+
+# Terminal A — start the server on :8000
+./device/scripts/11_run_llamacpp_server.sh</code></pre>
+
+        <pre><code class="language-bash"># Terminal B — 5-run streaming benchmark (text + text+image)
+./scripts/bench_llamacpp.sh</code></pre>
+
+        <h3>vLLM</h3>
+
+        <pre><code class="language-bash"># Terminal A — start the server on :8000
+./device/scripts/03_run_vllm_server.sh</code></pre>
+
+        <pre><code class="language-bash"># Terminal B — 5-run streaming benchmark (text + text+image)
+./scripts/bench_vllm.sh</code></pre>
+
+        <h3>TRT Edge-LLM</h3>
+
+        <pre><code class="language-bash"># One-time: CMA config + ONNX graph surgery (see §9)
+cat device/trt_cosmos_patches/README.md             # operator-facing recipe
+python3 device/trt_cosmos_patches/split_lm_head.py  # graph rewrite
+
+# Build LLM + visual engines (~10 min)
+./device/scripts/40_build_cosmos_trt_engines.sh
+
+# Verify correctness before timing
+./device/scripts/41_sanity_cosmos_trt.sh</code></pre>
+
+        <pre><code class="language-bash"># 5-run benchmark — TRT runs as a single-process CLI, no server needed
+./scripts/bench_trt.sh</code></pre>
 
         <p>
             Each script is idempotent and self-documenting. The blog's raw numbers, memory snapshots, CMA traces, and methodology notes are all in <code>vlm-benchmarks/assets/results/</code>. Investigation writeups for the TRT workaround are in <code>vlm-benchmarks/notes/trt_edgellm_cosmos_resolution.md</code>.
         </p>
 
-        <h2>12. For the robotics and autonomous-driving engineers reading this</h2>
+        <h2>13. For the robotics and autonomous-driving engineers reading this</h2>
 
         <p>
             The reason this work exists is that VLMs are becoming the grounded-reasoning layer in robotics and AV perception stacks, and the hardware they need to run on is a Jetson-class edge module — not a datacenter GPU. Getting a 2B VLM to serve at 60 tokens per second on a $250 board, in under 5 GB of memory, with a real Python-free inference runtime, is a concrete capability. It's enough to describe what a camera sees in close to real time, answer grounded questions about the scene, and feed structured reasoning traces to a planner.
